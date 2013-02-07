@@ -18,7 +18,7 @@ init(_A) ->
 handle_call(A, _F, B) ->
     {reply, A, B}.
 
-handle_cast(A, B) ->
+handle_cast(_A, B) ->
     {noreply, B}.
 
 
