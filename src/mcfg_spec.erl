@@ -40,7 +40,7 @@ create_profile_from_reg(Dir,Flist,McfgId) ->
 %
 insert_entries(D, []) ->
     D;
-insert_entries(D, [E=#nlentry{nlid=NLid,name=Name}|R]) ->
+insert_entries(D, [E=#nlentry_spec{nlid=NLid,name=Name}|R]) ->
     case dict:is_key(NLid, D) of
         true ->
             D2 = dict:update(NLid, fun (NL) -> dict:store(Name, E, NL) end, D),

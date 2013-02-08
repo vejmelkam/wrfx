@@ -5,8 +5,7 @@
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib,
-                  mnesia
+                  stdlib
                  ]},
   {mod, { mcfg_app, []}},
   {env, []}

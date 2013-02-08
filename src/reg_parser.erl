@@ -32,7 +32,7 @@ parse_rconfig([Type,Name,NLSpec,Numspec|_Rest], Acc) ->
     case string:tokens(NLSpec, ",") of
         ["namelist",NLName] ->
             NS = parse_numspec(Numspec),
-            [#nlentry{nlid=NLName, name=Name, type=parse_type(Type), mult=NS}|Acc];
+            [#nlentry_spec{nlid=NLName, name=Name, type=parse_type(Type), mult=NS}|Acc];
         ["derived"] ->
             Acc
     end.
