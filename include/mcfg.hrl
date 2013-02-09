@@ -8,13 +8,13 @@
 
 %% model configuration
 -record(mcfg, {mcfgid,
-               time_chunk,
-               hist_chunk,
-               dom_chunk,
-               io_chunk,
-               restart_chunk,
-               mcfg_spec}).
+	       cfg,
+	       def_wrf_nl,
+	       def_wps_nl,
+               spec}).
 
-%% a configuration chunk (spatial, domain, domains, input, output, restart, etc.)
+%% a configuration chunk - either internal configuration or namelist
 -record(cfg_chunk, {id, kvstore}).
 
+%% a namelist file
+-record(nlfile, {id, nlists}).

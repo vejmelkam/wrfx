@@ -15,11 +15,11 @@ to_wrf_nl(C) ->
     dict:store("time_control", NL2, NLWRF).
 
 
-write_from_to(#mcfg{time_chunk=TC,dom_chunk=DC, mcfg_spec=MS}, NL) ->
+write_from_to(#mcfg{cfg=C, spec=MS}, NL) ->
 
     % both of these must be standard erlang dates
-    Ts={{Sy, Sm, Sd}, {Shr, Smin, Ssec}} = cfg_chunk:get(dt_from, TC),
-    Te={{Ey, Em, Ed}, {Ehr, Emin, Esec}} = cfg_chunk:get(dt_to, TC),
+    Ts={{Sy, Sm, Sd}, {Shr, Smin, Ssec}} = cfg_chunk:get(dt_from, C),
+    Te={{Ey, Em, Ed}, {Ehr, Emin, Esec}} = cfg_chunk:get(dt_to, C),
     {Rdays, {Rhrs, Rmins, Rsecs}} = calendar:time_difference(Te, Ts),
 
     TCSpec = mcfg_spec:nlspec("time_control", MS),
@@ -32,17 +32,17 @@ write_from_to(#mcfg{time_chunk=TC,dom_chunk=DC, mcfg_spec=MS}, NL) ->
                       Sy, Sm, Sd, Shr, Smin, Ssec,
                       Ey, Em, Ed, Ehr, Emin, Esec ],
                      NL,
-                     DC,
+                     C,
                      TCSpec).
 
-write_io_policy(#mcfg{io_chunk=IO,dom_chunk=DC,mcfg_spec=MS}, NL) ->
+write_io_policy(#mcfg{cfg=C,spec=MS}, NL) ->
 
-    GS = cfg_chunk:get(grib_interval_seconds, IO),
-    HI = cfg_chunk:get(history_interval_min, IO),
-    FO = cfg_chunk:get(frames_per_outfile, IO),
-    R = cfg_chunk:get(restart, IO),
-    RI = cfg_chunk:get(restart_interval_min, IO),
-    DL = cfg_chunk:get(debug_level, IO),
+    GS = cfg_chunk:get(grib_interval_seconds, C),
+    HI = cfg_chunk:get(history_interval_min, C),
+    FO = cfg_chunk:get(frames_per_outfile, C),
+    R = cfg_chunk:get(restart, C),
+    RI = cfg_chunk:get(restart_interval_min, C),
+    DL = cfg_chunk:get(debug_level, C),
 
     TCSpec = mcfg_spec:nlspec("time_control", MS),
 
@@ -50,7 +50,7 @@ write_io_policy(#mcfg{io_chunk=IO,dom_chunk=DC,mcfg_spec=MS}, NL) ->
                     "io_form_history", "io_form_restart", "io_form_input", "io_form_boundary", "debug_level"],
                      [GS, R, RI, HI, FO, 2, 2, 2, 2, DL],
                      NL,
-                     DC,
+                     C,
                      TCSpec).
 
 
