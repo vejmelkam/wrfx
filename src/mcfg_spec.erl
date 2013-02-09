@@ -3,7 +3,7 @@
 -author(vejmelkam@gmail.com).
 
 -include("include/mcfg.hrl").
--export([default_registry_files/0, create_profile_from_reg/2, create_profile_from_reg/3,nllist/1,nl/2]).
+-export([default_registry_files/0, create_profile_from_reg/2, create_profile_from_reg/3,nlslist/1,nlspec/2]).
 
 
 % Returns the standard registry list that should be parsed to generate
@@ -22,10 +22,7 @@ default_registry_files() ->
 
 
 create_profile_from_reg(Dir,McfgId) ->
-    Fpaths = lists:map(fun(X) ->filename:join(Dir, X) end, default_registry_files()),
-    Entries = lists:map(fun reg_parser:parse_file/1, Fpaths),
-    #mcfg_spec{mcfgid=McfgId, nls=insert_entries(dict:new(), lists:flatten(Entries))}.
-
+    create_profile_from_reg(Dir, default_registry_files(), McfgId).
 
 % Parse a list of registry files (all in the same directory), obtain
 % all the namelist entries there and return them as a dict of lists
@@ -33,7 +30,13 @@ create_profile_from_reg(Dir,McfgId) ->
 create_profile_from_reg(Dir,Flist,McfgId) ->
     Fpaths = lists:map(fun(X) -> filename:join(Dir,X) end, Flist),
     Entries = lists:map(fun reg_parser:parse_file/1, Fpaths),
-    #mcfg_spec{mcfgid=McfgId, nls=insert_entries(dict:new(), lists:flatten(Entries))}.
+
+    % add some entries that are in io_boilerplate registry which has ifdefs and whatnot
+    Entries2 = [ #nlentry_spec{nlid="time_control", name="restart", type=logical, mult=1},
+                 #nlentry_spec{nlid="time_control", name="restart_interval", type=integer, mult=1},
+                 #nlentry_spec{nlid="time_control", name="history_interval", type=integer, mult=1} | Entries ],
+
+    #mcfg_spec{mcfgid=McfgId, nls=insert_entries(dict:new(), lists:flatten(Entries2))}.
 
 
 % Insert all nlentries in list into a depth 2 tree of dictionaries for easy access later.
@@ -46,7 +49,7 @@ insert_entries(D, [E=#nlentry_spec{nlid=NLid,name=Name}|R]) ->
             D2 = dict:update(NLid, fun (NL) -> dict:store(Name, E, NL) end, D),
             insert_entries(D2, R);
         false ->
-            NL = dict:append(Name, E, dict:new()),
+            NL = dict:store(Name, E, dict:new()),
             insert_entries(dict:store(NLid, NL, D), R)
     end.
 
@@ -56,9 +59,9 @@ insert_entries(D, [E=#nlentry_spec{nlid=NLid,name=Name}|R]) ->
 
 
 % Retrieve a list of namelists that exist in the mcfg_spec.
-nllist(#mcfg_spec{nls=C}) ->
+nlslist(#mcfg_spec{nls=C}) ->
     dict:fetch_keys(C).
 
-nl(Name, #mcfg_spec{nls=C}) ->
+nlspec(Name, #mcfg_spec{nls=C}) ->
     dict:fetch(Name, C).
 
