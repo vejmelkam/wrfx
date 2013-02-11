@@ -62,6 +62,23 @@ insert_entries(D, [E=#nlentry_spec{nlid=NLid,name=Name}|R]) ->
 nlslist(#mcfg_spec{nls=C}) ->
     dict:fetch_keys(C).
 
+% Retrieve a namelist specification
 nlspec(Name, #mcfg_spec{nls=C}) ->
     dict:fetch(Name, C).
 
+% Convert the namelist spec to a string representation
+to_string(C) ->
+    R = io_lib:format("~p.",[C]),
+    lists:flatten(R).
+
+% Read a string representation into an erlang structure
+from_string(S) ->
+    {ok,Tokens,_} = erl_scan:string(S),
+    {ok,C}} = erl_parse:parse_term(Tokens),
+    C.
+
+
+load(F) ->
+    {ok, B} = file:read_file(F),
+    S = binary:bin_to_list(B),
+    from_string(S).

@@ -1,12 +1,15 @@
--module(cfg_chunk).
+-module(xcfg).
 -author(vejmelkam@gmail.com).
 
 -include("include/mcfg.hrl").
 
--export([new/1, new/2, load/1, id/1, vars/1, set/3, get/2, to_string/1, from_string/1,set_many/2]).
+-export([new/1, new/2, load/1, id/1, vars/1, set/3, get/2,
+	 to_string/1, from_string/1,set_many/2]).
+
 
 new(ID) ->
     #cfg_chunk{id=ID, kvstore=dict:new()}.
+
 
 new(ID, Props) ->
     C = new(ID),

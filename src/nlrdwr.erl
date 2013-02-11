@@ -1,10 +1,11 @@
 
--module(cfg_wrfnl).
+-module(nlrdwr).
 -author(vejmelkam@gmail.com).
 
 -include("include/mcfg.hrl").
 
 -export([to_wrf_nl/1]).
+
 
 to_wrf_nl(C) ->
     NLWRF = dict:new(),
