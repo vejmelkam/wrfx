@@ -1,5 +1,5 @@
 -module(mcfg_test).
--author(vejmelkam@gmail.com).
+-author("vejmelkam@gmail.com").
 
 -include("include/mcfg.hrl").
 

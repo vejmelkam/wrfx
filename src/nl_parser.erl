@@ -1,13 +1,14 @@
 
--module(nlf_parser).
--author(vejmelkam@gmail.com).
+-module(nl_parser).
+-author("vejmelkam@gmail.com").
 
 -include("include/mcfg.hrl").
 
 -export([parse/1]).
 
 
-% read in the file line by line and parse the namelists
+% read in the file line by line (removing comments)
+% parse 
 parse(F) ->
     {ok, D} = file:open(F, [read]),
     Lines = read_content(D, []),
@@ -18,11 +19,16 @@ parse(F) ->
 % read the entire file
 read_content(D, A) ->
     case io:get_line(D) of
-        eof -> file:close(D), A;
-        Line -> read_content(D, [reduce(Line)|A])
+        eof -> 
+	    file:close(D),
+	    A2 = lists:filter(fun(X) -> length(X) > 0 end, A),
+	    lists:reverse(A2);
+        {ok, Line} -> 
+	    read_content(D, [reduce(Line)|A])
     end.
 
 
+% strip whitespace and comments at end of line
 reduce(Line) ->
     L2 = string:strip(Line),
     case string:chr(L2, $!) of
@@ -33,8 +39,9 @@ reduce(Line) ->
             L3
     end.
 
+
+
 parse_namelists(D, Acc) ->
-    
     case find_namelist(D) of
         {ok, NLName} ->
             NL = {NLName, parse_namelist(D, dict:new())},
@@ -43,9 +50,17 @@ parse_namelists(D, Acc) ->
             not_found
     end.
 
-%FIXME: stub
-find_namelist(_D) ->
-    found.
+
+find_namelist(D) ->
+    case get_line(D) of
+	[$&|NLName] ->
+	    {ok, NLName};
+	[] ->
+	    find_namelist(D);
+	eof ->
+	    not_found
+end.
+
 
 parse_namelist(D, NLD) ->
     case parse_variable(D) of
@@ -56,31 +71,26 @@ parse_namelist(D, NLD) ->
     end.
 
 
-parse_variable(D) ->
-    {ok, _L} = get_line(D).
+parse_variable(_D) ->
+    ok.
             
 
 get_line(D) ->
-    {ok, L} = read_line(D),
-    case L of
-        [] ->
-            get_line(D);
-        ['!'|_R] ->
-            get_line(D);
-        _ ->
-            {ok, L}
-    end.
-
-
-read_line(D) ->
-    case io:get_line(D) of
+    Data = io:get_line(D),
+    case Data of
+	% end of file
         eof ->
-            parse_error;
-        {error, _E} ->
-            parse_error;
-        L ->
-            {ok, string:strip(L)}
+	    eof;
+	% comment line (skip)
+	{ok, L} ->
+            check_line(string:strip(L), D)
     end.
 
 
-            
+check_line([], D) ->
+    get_line(D);
+check_line([$!|_R], D) ->
+    get_line(D);
+check_line(L, D) ->
+    L.
+

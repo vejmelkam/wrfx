@@ -1,6 +1,6 @@
 
 -module(mcfg_spec).
--author(vejmelkam@gmail.com).
+-author("vejmelkam@gmail.com").
 
 -include("include/mcfg.hrl").
 -export([default_registry_files/0, create_profile_from_reg/2, create_profile_from_reg/3,nlslist/1,nlspec/2]).
@@ -74,7 +74,7 @@ to_string(C) ->
 % Read a string representation into an erlang structure
 from_string(S) ->
     {ok,Tokens,_} = erl_scan:string(S),
-    {ok,C}} = erl_parse:parse_term(Tokens),
+    {ok,C} = erl_parse:parse_term(Tokens),
     C.
 
 

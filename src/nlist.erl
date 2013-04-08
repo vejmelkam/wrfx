@@ -1,8 +1,9 @@
 
 -module(nlist).
--author(vejmelkam@gmail.com).
+-author("vejmelkam@gmail.com").
+-include("include/mcfg.hrl").
 
--export([entries/1, names/1, get_entry/2, load/1, store/2]).
+-export([sections/1, section/2, set_section/3, list_section/2, update/4, load/1, store/2]).
 
 load(F) ->
     {ok, C} = file:consult(F).
@@ -13,24 +14,28 @@ store(F, NL) ->
     file:write_file(F, R).
 
 
-% List of entries in the namelist.
+% List of sections in the namelist.
 % 
-nlists(#nlists{id=NLS}) ->
-    lists:foldl(fun (#cfg_chunk{id=E}, A) -> [E|A] end, [], NLS).
+sections(#nl{sections=Sections}) ->
+    dict:fetch_keys(Sections).
 
-
-% List all entry names in the current namelist (dict). 
+% Retrieve the section dictionary by name of the sections.
 %
-names(D) ->
-    dict:fold(fun (N, _E, A) -> [N|A] end, [], D).
+section(SName, #nl{sections=Sections}) ->
+    dict:fetch(SName, Sections).
+
+set_section(SName, SDict, NL=#nl{sections=Sections}) ->
+    NL#nl{sections=dict:store(SName, SDict, Sections)}.
 
 
-% Retrieve an entry by name.
-%
-get_entry(N, D) ->
-    case dict:is_key(N, D) of
-        true ->
-            dict:fetch(N, D);
-        false ->
-            no_such_entry
-    end.
+% Update a value related to the given section and key
+update(Sec, Key, Val, NL=#nl{sections=Sections}) ->
+    S = section(Sec, NL),
+    S2 = dict:store(Key, Val, S),
+    set_section(Sec, S2, NL).
+
+
+% Return the keys in given section
+list_section(SName, NL=#nl{sections=Sections}) ->
+    S = section(Sections, NL),
+    dict:fetch_keys(S).

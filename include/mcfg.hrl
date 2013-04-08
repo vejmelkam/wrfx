@@ -13,8 +13,5 @@
 	       def_wps_nl,
                spec}).
 
-%% a configuration chunk - either internal configuration or namelist
--record(cfg_chunk, {id, kvstore}).
-
-%% a namelist file
--record(nlfile, {id, nlists}).
+%% a namelist (sections is list of tuples {id, dict}, each of which represents a section in the namelist file)
+-record(nl, {id, sections}).
