@@ -1,6 +1,6 @@
 
 -module(nlrdwr).
--author(vejmelkam@gmail.com).
+-author("vejmelkam@gmail.com").
 
 -include("include/mcfg.hrl").
 
