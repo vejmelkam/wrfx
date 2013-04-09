@@ -3,7 +3,7 @@
 -author("vejmelkam@gmail.com").
 
 -include("include/mcfg.hrl").
--export([default_registry_files/0, create_profile_from_reg/2, create_profile_from_reg/3,nlslist/1,nlspec/2]).
+-export([default_registry_files/0, create_profile_from_reg/2, create_profile_from_reg/3,nlslist/1,nlspec/2,to_string/1,from_string/1,load/1]).
 
 
 % Returns the standard registry list that should be parsed to generate

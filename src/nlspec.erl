@@ -1,6 +1,6 @@
 
 -module(nlspec).
--author(vejmelkam@gmail.com).
+-author("vejmelkam@gmail.com").
 
 -export([entry_names/1,entries/1, entry/2]).
 

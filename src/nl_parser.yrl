@@ -1,19 +1,20 @@
 
 
-Nonterminals namelist sections section key_values key_value values.
-Terminals string ',' '&' '/' '='.
-Rootsymbol namelist.
+Nonterminals namelists namelist entries entry values.
+Terminals string ',' '&' '/' '=' ';'.
+Rootsymbol namelists.
 Endsymbol '$end'.
 
-namelist -> sections.
-sections -> section.
-sections -> section sections.
+namelists -> namelist.
+namelists -> namelist namelists.
 
-section -> '&' string key_values '/'.
-key_values -> key_value.
-key_values -> key_value key_values.
+namelist -> '&' string entries '/'.
 
-key_value -> string '=' values.
-values -> string ','.
-values -> string ',' values.
+entries -> entry.
+entries -> entry entries.
+
+entry -> string '=' values.
+values -> string ';'.
+values -> string ',' values ';'.
+
 
