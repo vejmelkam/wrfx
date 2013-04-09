@@ -1,5 +1,5 @@
 
--module(nl_parser2).
+-module(nl_parser).
 -author("vejmelkam@gmail.com").
 -include("include/mcfg.hrl").
 
@@ -29,7 +29,6 @@ parse_entries([{string,_N1,Key},{'=',_N2}|R], C) ->
 
 parse_values(R) ->
     parse_values(R, []).
-
 parse_values([{string, _N1, Val}, {',', _N2}|R], V) ->
     parse_values(R, [Val|V]);
 parse_values(R = [{string,_N1,_Key}, {'=', _N2}|_Rest], V) ->
