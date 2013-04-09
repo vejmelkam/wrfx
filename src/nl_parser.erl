@@ -7,24 +7,24 @@
 
 
 parse(T) ->
-    parse_namelists(T, []).
-
+    NL = parse_namelists(T, dict:new()),
+    #nl{id = "undefined", sections=NL}. 
 
 parse_namelists([], NLS) ->
-    lists:reverse(NLS);
+    NLS;
 parse_namelists([{'&', _N1},{string,_N2,NLName}|R], NLS) ->
     {R2, NL} = parse_entries(R),
-    [{'/', _N2}|R3] = R2,
-    parse_namelists(R3, [{NLName, NL}|NLS]).
+    [{'/', _N3}|R3] = R2,
+    parse_namelists(R3, dict:store(NLName, NL, NLS)).
 
 parse_entries(R) ->
-    parse_entries(R, []).
+    parse_entries(R, dict:new()).
 
 parse_entries(R=[{'/',_N2}|_Rest], C)->
-    {R, lists:reverse(C)};
+    {R, C};
 parse_entries([{string,_N1,Key},{'=',_N2}|R], C) ->
     {V,R2} = parse_values(R),
-    parse_entries(R2, [{Key, V}|C]).
+    parse_entries(R2, dict:store(Key,V,C)).
 
 
 parse_values(R) ->

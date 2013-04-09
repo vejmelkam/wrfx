@@ -14,8 +14,8 @@ scan(FName) ->
 scan_lines(L) ->
     scan_lines(L, [], 1).
 
-scan_lines([], T, N) ->
-%    lists:reverse([{'$end',N}|T]);
+scan_lines([], T, _N) ->
+%    lists:reverse([{'$end',N}|T]);  % used only with yecc parser
     lists:reverse(T);
 scan_lines([L|R], T, N) ->
     % scan tokens on this line (which are separated by whitespace, strings are inside ' pairs)
@@ -25,16 +25,16 @@ scan_lines([L|R], T, N) ->
     T2 = lists:foldl(fun (X, A) -> [process_token(X,N)|A] end, T, LF),
     scan_lines(R, T2, N+1).
 
-insert_entry_dividers(T) ->
-    insert_entry_dividers(T, []).
-insert_entry_dividers([{'=',N1}, {string,N2,Key}, {',', N3}|R], A) ->
-    insert_entry_dividers(R, [{';', N3}, {string,N2,Key}, {'=', N1} | A]);
-insert_entry_dividers([{'/', N1}, {',',N2}|R], A) ->
-    insert_entry_dividers(R, [{';',N2},{'/',N1}|A]);
-insert_entry_dividers([T|R], A) ->
-    insert_entry_dividers(R, [T|A]);
-insert_entry_dividers([], A) ->
-    lists:reverse(A).
+%% insert_entry_dividers(T) ->
+%%     insert_entry_dividers(T, []).
+%% insert_entry_dividers([{'=',N1}, {string,N2,Key}, {',', N3}|R], A) ->
+%%     insert_entry_dividers(R, [{';', N3}, {string,N2,Key}, {'=', N1} | A]);
+%% insert_entry_dividers([{'/', N1}, {',',N2}|R], A) ->
+%%     insert_entry_dividers(R, [{';',N2},{'/',N1}|A]);
+%% insert_entry_dividers([T|R], A) ->
+%%     insert_entry_dividers(R, [T|A]);
+%% insert_entry_dividers([], A) ->
+%%     lists:reverse(A).
 
 
 valid_token([]) ->	

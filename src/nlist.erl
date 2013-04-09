@@ -6,8 +6,8 @@
 -export([sections/1, section/2, set_section/3, list_section/2, update/4, load/1, store/2]).
 
 load(F) ->
-    {ok, C} = file:consult(F).
-
+    {ok, C} = file:consult(F),
+    C.
 
 store(F, NL) ->
     R = io_lib:format("~p.",[NL]),
@@ -29,13 +29,13 @@ set_section(SName, SDict, NL=#nl{sections=Sections}) ->
 
 
 % Update a value related to the given section and key
-update(Sec, Key, Val, NL=#nl{sections=Sections}) ->
+update(Sec, Key, Val, NL) ->
     S = section(Sec, NL),
     S2 = dict:store(Key, Val, S),
     set_section(Sec, S2, NL).
 
 
 % Return the keys in given section
-list_section(SName, NL=#nl{sections=Sections}) ->
-    S = section(Sections, NL),
+list_section(SName, NL) ->
+    S = section(SName, NL),
     dict:fetch_keys(S).

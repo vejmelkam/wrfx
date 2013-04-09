@@ -1,6 +1,6 @@
 
 -module(reg_parser).
--author(vejmelkam@gmail.com).
+-author("vejmelkam@gmail.com").
 
 -include("include/mcfg.hrl").
 -export([parse_file/1]).
