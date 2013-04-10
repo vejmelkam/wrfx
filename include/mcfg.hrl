@@ -13,5 +13,8 @@
 	       def_wps_nl,
                spec}).
 
-%% a namelist (sections is list of tuples {id, dict}, each of which represents a section in the namelist file)
--record(nl, {id, sections}).
+%% a namelist file containing zero or more namelists as property lists (see plist)
+-record(nlfile, {id, nls}).
+
+% a single namelist containing zero or more entries
+-record(nl, {id, entries}).
