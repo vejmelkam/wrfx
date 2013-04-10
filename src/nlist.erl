@@ -1,9 +1,12 @@
 
+
 -module(nlist).
 -author("vejmelkam@gmail.com").
 -include("include/mcfg.hrl").
 
--export([sections/1, section/2, set_section/3, list_section/2, update/4, load/1, store/2]).
+-export([sections/1, section/2, set_section/3,             % list sections
+	 list_section/2, update_entry/4,                   % section/entry functions
+	 load/1, store/2, parse/1, to_text/1, parse/2]).    % I/O of namelists
 
 load(F) ->
     {ok, C} = file:consult(F),
@@ -13,14 +16,9 @@ store(F, NL) ->
     R = io_lib:format("~p.",[NL]),
     file:write_file(F, R).
 
-
-% List of sections in the namelist.
-% 
 sections(#nl{sections=Sections}) ->
     dict:fetch_keys(Sections).
 
-% Retrieve the section dictionary by name of the sections.
-%
 section(SName, #nl{sections=Sections}) ->
     dict:fetch(SName, Sections).
 
@@ -29,7 +27,7 @@ set_section(SName, SDict, NL=#nl{sections=Sections}) ->
 
 
 % Update a value related to the given section and key
-update(Sec, Key, Val, NL) ->
+update_entry(Sec, Key, Val, NL) ->
     S = section(Sec, NL),
     S2 = dict:store(Key, Val, S),
     set_section(Sec, S2, NL).
@@ -39,3 +37,89 @@ update(Sec, Key, Val, NL) ->
 list_section(SName, NL) ->
     S = section(SName, NL),
     dict:fetch_keys(S).
+
+
+% parse an existing namelist in a file
+parse(FName) ->
+    parse(FName, FName).
+
+parse(FName, Name) ->
+    {ok, T} = nl_scanner:scan(FName),
+    {ok, G} = nl_parser:parse(T),
+    #nl{id = Name, sections = tree_to_sections(G)}.
+
+tree_to_sections(G) ->
+    S = cons2list(slist, G),
+    L = lists:map(fun decode_section/1, S),
+    dict:from_list(L).
+
+decode_section({section, SName, empty}) ->
+    {SName, dict:new()};
+decode_section({section, SName, Entries}) ->
+    S = cons2list(entries, Entries),
+    L = lists:map(fun ({K, V}) -> {K, convert_type(cons2list(values, V))} end, S),
+    {SName, dict:from_list(L)}.
+
+
+cons2list(T, L) ->
+    cons2list(T, L, []).
+cons2list(T, {T, E, R}, A) ->
+    cons2list(T, R, [E|A]);
+cons2list(_T, E, A) ->
+    lists:reverse([E|A]).
+
+
+convert_type(L) ->
+    convert_type(L, []).
+convert_type([], A) ->
+    lists:reverse(A);
+convert_type([".false."|L], A) ->
+    convert_type(L, [false|A]);
+convert_type([".true."|L], A) ->
+    convert_type(L, [true|A]);
+convert_type([X|L], A) ->
+    D = lists:foldl(fun (F,Acc) -> try_decode(F,X,Acc) end, [], ["~u", "~d", "~f"]),
+    case D of
+	[] ->
+	    convert_type(L, [X|A]);
+	[V] ->
+	    convert_type(L, [V|A])
+    end.
+
+try_decode(F,X,[]) ->
+    case io_lib:fread(F, X) of
+	{ok, [V], []} ->
+	    [V];
+	{ok, [V], "."} ->   % special case for fortan floats "290." with no trailing zero
+	    [V];
+	{ok, _V, _Rest} ->
+	    [];
+	{error, _} ->
+	    []
+    end;
+try_decode(_F, _X, A) ->
+    A.
+
+    
+
+
+to_text(#nl{sections=SS}) ->
+    S2 = dict:fold(fun write_section/3, [], SS),
+    lists:flatten(S2).
+
+write_section(N, S, A) ->
+    E = dict:fold(fun write_value_list/3, [], S),
+    ["&", N, "\n", [string:join(lists:reverse(E), "\n")|"\n/\n\n"]|A].
+
+write_value_list(K, V, A) ->
+    VS = lists:map(fun write_value/1, V),
+    [[K, "\t=\t", string:join(VS, ",\t"), ","]|A].
+
+
+write_value(false) ->
+    ".false.";
+write_value(true) ->
+    ".true.";
+write_value(X) ->
+    io_lib:format("~p", [X]).
+

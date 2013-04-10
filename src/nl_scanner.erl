@@ -8,38 +8,31 @@ scan(FName) ->
     {ok, D} = file:open(FName, [read]),
     L = read_lines(D, []),
     file:close(D),
-    scan_lines(L).
+    L2 = scan_lines(L),
+    L3 = find_key_tokens(L2),
+    {ok, D2} = file:open("../scanner.out", [write]),
+    io:format(D2,"~p", [L3]),
+    file:close(D2),
+    {ok, L3}.
 
 
 scan_lines(L) ->
     scan_lines(L, [], 1).
 
-scan_lines([], T, _N) ->
-%    lists:reverse([{'$end',N}|T]);  % used only with yecc parser
-    lists:reverse(T);
+scan_lines([], T, N) ->
+    lists:reverse([{'$end',N}|T]);
 scan_lines([L|R], T, N) ->
     % scan tokens on this line (which are separated by whitespace, strings are inside ' pairs)
-    {ok, RE} = re:compile("(/)|(&)|(=)|([\\w\\.]+)|'(.+)'|(,)"),
+    {ok, RE} = re:compile("(/)|(&)|(=)|([-\\w\\.]+)|'(.+)'|(,)"),
     LT = re:split(L, RE, [{return, list}]),
     LF = lists:filter(fun valid_token/1, LT),
     T2 = lists:foldl(fun (X, A) -> [process_token(X,N)|A] end, T, LF),
     scan_lines(R, T2, N+1).
 
-%% insert_entry_dividers(T) ->
-%%     insert_entry_dividers(T, []).
-%% insert_entry_dividers([{'=',N1}, {string,N2,Key}, {',', N3}|R], A) ->
-%%     insert_entry_dividers(R, [{';', N3}, {string,N2,Key}, {'=', N1} | A]);
-%% insert_entry_dividers([{'/', N1}, {',',N2}|R], A) ->
-%%     insert_entry_dividers(R, [{';',N2},{'/',N1}|A]);
-%% insert_entry_dividers([T|R], A) ->
-%%     insert_entry_dividers(R, [T|A]);
-%% insert_entry_dividers([], A) ->
-%%     lists:reverse(A).
 
-
-valid_token([]) ->	
-    false;
 valid_token("\n") ->
+    false;
+valid_token(",") ->
     false;
 valid_token(T) ->
     case string:strip(T) of
@@ -50,12 +43,21 @@ valid_token(T) ->
     end.
 
 
+% replace consecutive string and '=' tokens with a key token
+find_key_tokens(L) ->
+    find_key_tokens(L, []).
+find_key_tokens([], A) ->
+    lists:reverse(A);
+find_key_tokens([{string, N1, Key}, {'=', _N2}|R], A) ->
+    find_key_tokens(R, [{key, N1, Key}|A]);
+find_key_tokens([T|R], A) ->
+    find_key_tokens(R, [T|A]).
+
+
 process_token("=", N) ->
     {'=', N};
 process_token("&", N) ->
     {'&', N};
-process_token(",", N) ->
-    {',', N};
 process_token("/", N) ->
     {'/', N};
 process_token(T, N) ->
