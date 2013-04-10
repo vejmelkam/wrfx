@@ -8,14 +8,19 @@ scan(FName) ->
     {ok, D} = file:open(FName, [read]),
     L = read_lines(D, []),
     file:close(D),
-    scan_lines(L).
+    L2 = scan_lines(L),
+    L3 = find_key_tokens(L2),
+    {ok, D2} = file:open("../scanner.out", [write]),
+    io:format(D2,"~p", [L3]),
+    file:close(D2),
+    {ok, L3}.
 
 
 scan_lines(L) ->
     scan_lines(L, [], 1).
 
 scan_lines([], T, N) ->
-    lists:reverse([{"$end",N}|T]);
+    lists:reverse([{'$end',N}|T]);
 scan_lines([L|R], T, N) ->
     % scan tokens on this line (which are separated by whitespace, strings are inside ' pairs)
     {ok, RE} = re:compile("(/)|(&)|(=)|([\\w\\.]+)|'(.+)'|(,)"),
@@ -25,9 +30,9 @@ scan_lines([L|R], T, N) ->
     scan_lines(R, T2, N+1).
 
 
-valid_token([]) ->	
-    false;
 valid_token("\n") ->
+    false;
+valid_token(",") ->
     false;
 valid_token(T) ->
     case string:strip(T) of
@@ -38,14 +43,23 @@ valid_token(T) ->
     end.
 
 
+% replace consecutive string and '=' tokens with a key token
+find_key_tokens(L) ->
+    find_key_tokens(L, []).
+find_key_tokens([], A) ->
+    lists:reverse(A);
+find_key_tokens([{string, N1, Key}, {'=', _N2}|R], A) ->
+    find_key_tokens(R, [{key, N1, Key}|A]);
+find_key_tokens([T|R], A) ->
+    find_key_tokens(R, [T|A]).
+
+
 process_token("=", N) ->
-    {"=", N};
+    {'=', N};
 process_token("&", N) ->
-    {"&", N};
-process_token(",", N) ->
-    {",", N};
+    {'&', N};
 process_token("/", N) ->
-    {"/", N};
+    {'/', N};
 process_token(T, N) ->
     {string, T, N}.
 

@@ -1,19 +1,19 @@
 
-
-Nonterminals namelist sections section key_values key_value values.
-Terminals string ',' '&' '/' '='.
+Nonterminals namelist sections section entries entry values.
+Terminals key string '&' '/'.
 Rootsymbol namelist.
 Endsymbol '$end'.
 
-namelist -> sections.
-sections -> section.
-sections -> section sections.
+namelist -> sections : '$1'.
+sections -> section : '$1'.
+sections -> section sections : {slist, '$1', '$2'}.
 
-section -> '&' string key_values '/'.
-key_values -> key_value.
-key_values -> key_value key_values.
+section -> '&' string '/' : {section, element(2, '$2'), empty}.
+section -> '&' string entries '/' : {section, element(2, '$2'), '$3'}.
+entries -> entry : '$1'.
+entries -> entry entries : {entries, '$1', '$2'}.
 
-key_value -> string '=' values.
-values -> string ','.
-values -> string ',' values.
+entry -> key values : {entry, element(2,'$1'), '$2'}.
+values -> string : element(2, '$1').
+values -> string values : {values, element(2, '$1'), '$2'}.
 
