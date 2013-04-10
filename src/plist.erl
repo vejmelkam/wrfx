@@ -1,5 +1,4 @@
 
-
 -module(plist).
 -author("vejmelkam@gmail.com").
 -include("include/mcfg.hrl").
@@ -8,7 +7,7 @@
 
 
 get_keys(P) ->
-    lists:foldl(fun ({Key, _S}, A) -> [Key|A] end, [], P).
+    lists:map(fun ({Key, _S}) -> Key end, P).
     
 
 set_value(K, V, []) ->
@@ -19,18 +18,18 @@ set_value(K, V, [{K1,V1}|P]) ->
     [{K1,V1}|set_value(K, V, P)].
 
 
-get_value(K, []) ->
+get_value(_K, []) ->
     not_found;
-get_value(K, [{K,V}|P]) ->
+get_value(K, [{K,V}|_P]) ->
     V;
-get_value(K, [E|P]) ->
+get_value(K, [_E|P]) ->
     get_value(K, P).
 
 
-has_key(K, []) ->
+has_key(_K, []) ->
     false;
-has_key(K, [{K,_V}|P]) ->
+has_key(K, [{K,_V}|_P]) ->
     true;
-has_key(K, [E|P]) ->
+has_key(K, [_E|P]) ->
     has_key(K, P).
 

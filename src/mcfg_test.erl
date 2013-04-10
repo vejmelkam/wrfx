@@ -11,9 +11,7 @@ test() ->
     MS = mcfg_spec:create_profile_from_reg(WRFDir, vanilla_wrf_v34),
 
     P = [ {domain_num, 2}, {dt_from, {{2012, 6, 1}, {0, 0, 0}}}, {dt_to, {{2012, 6, 3}, {0, 0, 0}}} ],
-    NLS = nlfile:parse("data/namelist.input"),
-    
-    nlrender:to_nl(Cfg, DP).
+    NLS = nlfile:parse("data/namelist.input").
 
 
 test2() ->

@@ -1,5 +1,5 @@
 
--module(nl_scanner).
+-module(nlscanner).
 -author("vejmelkam@gmail.com").
 -export([scan/1]).
 
