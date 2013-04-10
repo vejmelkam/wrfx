@@ -17,26 +17,25 @@ store(F, NL) ->
     file:write_file(F, R).
 
 sections(#nl{sections=Sections}) ->
-    dict:fetch_keys(Sections).
+    plist:get_keys(Sections).
 
 section(SName, #nl{sections=Sections}) ->
-    dict:fetch(SName, Sections).
+    plist:find_key(SName, Sections).
 
-set_section(SName, SDict, NL=#nl{sections=Sections}) ->
-    NL#nl{sections=dict:store(SName, SDict, Sections)}.
+set_section(SName, Sec, NL=#nl{sections=Sections}) ->
+    NL#nl{sections = plist:set_value(SName, Sec, Sections)}.
 
 
 % Update a value related to the given section and key
 update_entry(Sec, Key, Val, NL) ->
     S = section(Sec, NL),
-    S2 = dict:store(Key, Val, S),
+    S2 = plist:set_value(Key, Val, S),
     set_section(Sec, S2, NL).
 
 
 % Return the keys in given section
 list_section(SName, NL) ->
-    S = section(SName, NL),
-    dict:fetch_keys(S).
+    plist:get_keys(section(SName, NL)).
 
 
 % parse an existing namelist in a file
@@ -50,15 +49,15 @@ parse(FName, Name) ->
 
 tree_to_sections(G) ->
     S = cons2list(slist, G),
-    L = lists:map(fun decode_section/1, S),
-    dict:from_list(L).
+    lists:map(fun decode_section/1, S).
+    
 
 decode_section({section, SName, empty}) ->
-    {SName, dict:new()};
+    {SName, []};
 decode_section({section, SName, Entries}) ->
     S = cons2list(entries, Entries),
     L = lists:map(fun ({K, V}) -> {K, convert_type(cons2list(values, V))} end, S),
-    {SName, dict:from_list(L)}.
+    {SName, L}.
 
 
 cons2list(T, L) ->
@@ -86,6 +85,7 @@ convert_type([X|L], A) ->
 	    convert_type(L, [V|A])
     end.
 
+
 try_decode(F,X,[]) ->
     case io_lib:fread(F, X) of
 	{ok, [V], []} ->
@@ -102,18 +102,17 @@ try_decode(_F, _X, A) ->
 
     
 
-
 to_text(#nl{sections=SS}) ->
-    S2 = dict:fold(fun write_section/3, [], SS),
+    S2 = lists:map(fun write_section/1, SS),
     lists:flatten(S2).
 
-write_section(N, S, A) ->
-    E = dict:fold(fun write_value_list/3, [], S),
-    ["&", N, "\n", [string:join(lists:reverse(E), "\n")|"\n/\n\n"]|A].
+write_section({N, S}) ->
+    E = lists:map(fun write_value_list/1, S),
+    ["&", N, "\n", [string:join(E, "\n")|"\n/\n\n"]].
 
-write_value_list(K, V, A) ->
+write_value_list({K, V}) ->
     VS = lists:map(fun write_value/1, V),
-    [[K, "\t=\t", string:join(VS, ",\t"), ","]|A].
+    [K, "\t=\t", string:join(VS, ",\t"), ","].
 
 
 write_value(false) ->
