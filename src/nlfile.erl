@@ -31,8 +31,7 @@ parse(FName) ->
 parse(FName, Name) ->
     {ok, T} = nlscanner:scan(FName),
     {ok, NLS} = nlparser:parse(T),
-    NLS2 = lists:map(fun ({NLName,NL}) -> {NLName, nlist:convert_values(NL)} end, NLS),
-    #nlfile{id=Name, nls=NLS2}.
+    #nlfile{id=Name, nls=NLS}.
     
 to_text(#nlfile{nls=N}) ->
     S2 = lists:map(fun nlist:to_text/1, N),
