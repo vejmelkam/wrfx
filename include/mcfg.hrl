@@ -1,7 +1,12 @@
 
 
+%% namelist specifications read in from the Registry
+-record(nlspec, {id, entries}).
+
 %% information on a namelist entry obtained from a Registry file
--record(nlentry_spec, {nlid, name, type, mult}).
+-record(nlspec_entry, {nlid, name, type, mult}).
+
+
 
 %% model configuration spec
 -record(mcfg_spec, {mcfgid, nls}).

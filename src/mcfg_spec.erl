@@ -32,9 +32,9 @@ create_profile_from_reg(Dir,Flist,McfgId) ->
     Entries = lists:map(fun reg_parser:parse_file/1, Fpaths),
 
     % add some entries that are in io_boilerplate registry which has ifdefs and whatnot
-    Entries2 = [ #nlentry_spec{nlid="time_control", name="restart", type=logical, mult=1},
-                 #nlentry_spec{nlid="time_control", name="restart_interval", type=integer, mult=1},
-                 #nlentry_spec{nlid="time_control", name="history_interval", type=integer, mult=1} | Entries ],
+    Entries2 = [ #nlspec_entry{nlid="time_control", name="restart", type=logical, mult=1},
+                 #nlspec_entry{nlid="time_control", name="restart_interval", type=integer, mult=1},
+                 #nlspec_entry{nlid="time_control", name="history_interval", type=integer, mult=1} | Entries ],
 
     #mcfg_spec{mcfgid=McfgId, nls=insert_entries(dict:new(), lists:flatten(Entries2))}.
 
@@ -43,7 +43,7 @@ create_profile_from_reg(Dir,Flist,McfgId) ->
 %
 insert_entries(D, []) ->
     D;
-insert_entries(D, [E=#nlentry_spec{nlid=NLid,name=Name}|R]) ->
+insert_entries(D, [E=#nlspec_entry{nlid=NLid,name=Name}|R]) ->
     case dict:is_key(NLid, D) of
         true ->
             D2 = dict:update(NLid, fun (NL) -> dict:store(Name, E, NL) end, D),
@@ -53,10 +53,6 @@ insert_entries(D, [E=#nlentry_spec{nlid=NLid,name=Name}|R]) ->
             insert_entries(dict:store(NLid, NL, D), R)
     end.
 
-% Store a model configuration profile in an ets table.
-%
-%store(E, CName, Cfg) ->
-
 
 % Retrieve a list of namelists that exist in the mcfg_spec.
 nlslist(#mcfg_spec{nls=C}) ->
@@ -64,7 +60,7 @@ nlslist(#mcfg_spec{nls=C}) ->
 
 % Retrieve a namelist specification
 nlspec(Name, #mcfg_spec{nls=C}) ->
-    dict:fetch(Name, C).
+    #nlspec{id=Name, entries=dict:fetch(Name, C)}.
 
 % Convert the namelist spec to a string representation
 to_string(C) ->

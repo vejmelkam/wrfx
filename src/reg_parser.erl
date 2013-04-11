@@ -5,6 +5,7 @@
 -include("include/mcfg.hrl").
 -export([parse_file/1]).
 
+
 parse_file(Fname) ->
     {ok, IO} = file:open(Fname, [read]),
     foreach_line(IO, []).
@@ -32,7 +33,7 @@ parse_rconfig([Type,Name,NLSpec,Numspec|_Rest], Acc) ->
     case string:tokens(NLSpec, ",") of
         ["namelist",NLName] ->
             NS = parse_numspec(Numspec),
-            [#nlentry_spec{nlid=NLName, name=Name, type=parse_type(Type), mult=NS}|Acc];
+            [#nlspec_entry{nlid=NLName, name=Name, type=parse_type(Type), mult=NS}|Acc];
         ["derived"] ->
             Acc
     end.

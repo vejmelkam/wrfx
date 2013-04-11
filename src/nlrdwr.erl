@@ -63,7 +63,7 @@ render_cfg_to_nl([K|Vars], [V|Vals], A, DC, NLSpec) ->
 
     % find the entry in the specification an extract
     io:format("~p~n", [nlspec:entry(K, NLSpec)]),
-    #nlentry_spec{mult=M} = nlspec:entry(K, NLSpec),
+    #nlspec_entry{mult=M} = nlspec:entry(K, NLSpec),
     
     % expand value according to namelist rules
     L = compute_length(M, DC),
