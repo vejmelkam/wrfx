@@ -6,6 +6,9 @@
 -export([set_value/3, get_keys/1, get_value/2, has_key/2]).
 
 
+new() ->
+    [].
+
 get_keys(P) ->
     lists:map(fun ({Key, _S}) -> Key end, P).
     

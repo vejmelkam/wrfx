@@ -7,6 +7,10 @@
 	 load/1, store/2,                                     % load and store erlang representation of namelist file
 	 parse/1, parse/2, to_text/1]).                       % namelist file I/O
 
+new(Id) ->
+    #nlfile{id=Id, nls = plist:new()}.
+
+
 load(F) ->
     {ok, C} = file:consult(F),
     C.
@@ -21,8 +25,8 @@ namelists(#nlfile{nls=NLS}) ->
 namelist(Id, #nlfile{nls=NLS}) ->
     plist:get_value(Id, NLS).
 
-set_namelist(NLId, NL, NLF=#nlfile{nls=NLS}) ->
-    NLF#nlfile{nls = plist:set_value(NLId, NL, NLS)}.
+set_namelist(Id, NL, NLF=#nlfile{nls=NLS}) ->
+    NLF#nlfile{nls = plist:set_value(Id, NL, NLS)}.
 
 
 parse(FName) ->

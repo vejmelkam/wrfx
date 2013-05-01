@@ -7,20 +7,11 @@
 -export([to_wrf_nl/1]).
 
 
-to_wrf_nl(C) ->
-    NLWRF = dict:new(),
-
-    NL = write_from_to(C, []),
-    NL2 = write_io_policy(C, NL),
-    
-    dict:store("time_control", NL2, NLWRF).
-
-
-write_from_to(#mcfg{cfg=C, spec=MS}, NL) ->
+write_time_range(#mcfg{cfg=C, wrf_nl_spec=MS}, NL) ->
 
     % both of these must be standard erlang dates
-    Ts={{Sy, Sm, Sd}, {Shr, Smin, Ssec}} = cfg_chunk:get(dt_from, C),
-    Te={{Ey, Em, Ed}, {Ehr, Emin, Esec}} = cfg_chunk:get(dt_to, C),
+    Ts={{Sy, Sm, Sd}, {Shr, Smin, Ssec}} = dict:fetch(dt_from, C),
+    Te={{Ey, Em, Ed}, {Ehr, Emin, Esec}} = dict:fetch(dt_to, C),
     {Rdays, {Rhrs, Rmins, Rsecs}} = calendar:time_difference(Te, Ts),
 
     TCSpec = mcfg_spec:nlspec("time_control", MS),
@@ -36,48 +27,47 @@ write_from_to(#mcfg{cfg=C, spec=MS}, NL) ->
                      C,
                      TCSpec).
 
-write_io_policy(#mcfg{cfg=C,spec=MS}, NL) ->
 
-    GS = cfg_chunk:get(grib_interval_seconds, C),
-    HI = cfg_chunk:get(history_interval_min, C),
-    FO = cfg_chunk:get(frames_per_outfile, C),
-    R = cfg_chunk:get(restart, C),
-    RI = cfg_chunk:get(restart_interval_min, C),
-    DL = cfg_chunk:get(debug_level, C),
+write_io_policy(#mcfg{cfg=C, wrf_nl_spec=MS}, NL) ->
+
+    GS = dict:fetch(grib_interval_seconds, C),
+    HI = dict:fetch(history_interval_min, C),
+    FO = dict:fetch(frames_per_outfile, C),
+    RI = dict:fetch(restart_interval_min, C),
 
     TCSpec = mcfg_spec:nlspec("time_control", MS),
 
-    render_cfg_to_nl(["interval_seconds", "restart", "restart_interval", "history_interval", "frames_per_outfile",
-                    "io_form_history", "io_form_restart", "io_form_input", "io_form_boundary", "debug_level"],
-                     [GS, R, RI, HI, FO, 2, 2, 2, 2, DL],
-                     NL,
-                     C,
-                     TCSpec).
+    update_namelist_from_list([{"interval_seconds", GS},
+			       {"restart_interval", RI},
+			       {"history_interval", "HI"},
+			       {"frames_per_outfile", FO}],
+			      NL,
+			      C,
+			      TCSpec).
+
+update_nl_with_list([], NL, _C, _NLSpec) ->
+    NL;
+update_nl_with_list([{K, V}|R], NL, C, NLSpec) ->
+    NL2 = update_namelist(K, V, NL, C, NLSpec),
+    update_namelist_from_list(Keys, Vals, NL2, C, NLSpec).
 
 
-
-render_cfg_to_nl([], [], A, _DC, _NLSpec) ->
-    A;
-
-render_cfg_to_nl([K|Vars], [V|Vals], A, DC, NLSpec) ->
-
+update_namelist(K, V, NL, C, NLSpec) ->
+    
     % find the entry in the specification an extract
-    io:format("~p~n", [nlspec:entry(K, NLSpec)]),
     #nlspec_entry{mult=M} = nlspec:entry(K, NLSpec),
     
     % expand value according to namelist rules
-    L = compute_length(M, DC),
+    L = compute_length(M, C),
     {ok, V2} = expand_and_check(V, L),
 
-    % add to the namelist
-    A2 = [{K, V2}|A],
-
-    render_cfg_to_nl(Vars, Vals, A2, DC, NLSpec).
+    % update the namelist with this key/value
+    nlist:set_entry(K, V, NL).
 
 
 % compute the correct length of the argument
-compute_length(max_domains, DC) ->
-    cfg_chunk:get(domain_num, DC);
+compute_length(max_domains, C) ->
+    dict:fetch(domain_num, C);
 compute_length(N, _DC) when is_number(N) ->
     N.
 
