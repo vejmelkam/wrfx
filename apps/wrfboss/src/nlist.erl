@@ -2,10 +2,10 @@
 
 -module(nlist).
 -author("vejmelkam@gmail.com").
--include("include/mcfg.hrl").
+-include("include/wrf_cfg.hrl").
 
--export([entries/1, entry/2, set_entry/3,                % standard namelist access functions
-	 to_text/1]).                                    % constructs a text representation of the namelist (readable by fortran)
+-export([entries/1, entry/2, set_entry/3,
+	 to_text/1]).  % renders namelist to FORTRAN readable format
 
 % Return the keys in given section
 entries(#nl{entries=E}) ->

@@ -1,8 +1,8 @@
 
--module(mcfg_spec).
+-module(wrf_reg).
 -author("vejmelkam@gmail.com").
 
--include("include/mcfg.hrl").
+-include("include/wrf_cfg.hrl").
 -export([default_registry_files/0, create_profile_from_reg/2, create_profile_from_reg/3,nlslist/1,nlspec/2,to_string/1,from_string/1,load/1]).
 
 
@@ -21,13 +21,13 @@ default_registry_files() ->
       'registry.fire' ].
 
 
-create_profile_from_reg(Dir,McfgId) ->
-    create_profile_from_reg(Dir, default_registry_files(), McfgId).
+create_profile_from_reg(Dir,Id) ->
+    create_profile_from_reg(Dir, default_registry_files(), Id).
 
 % Parse a list of registry files (all in the same directory), obtain
 % all the namelist entries there and return them as a dict of lists
 % by namelist name.
-create_profile_from_reg(Dir,Flist,McfgId) ->
+create_profile_from_reg(Dir,Flist,Id) ->
     Fpaths = lists:map(fun(X) -> filename:join(Dir,X) end, Flist),
     Entries = lists:map(fun reg_parser:parse_file/1, Fpaths),
 
@@ -36,7 +36,7 @@ create_profile_from_reg(Dir,Flist,McfgId) ->
                  #nlspec_entry{nlid="time_control", name="restart_interval", type=integer, mult=1},
                  #nlspec_entry{nlid="time_control", name="history_interval", type=integer, mult=1} | Entries ],
 
-    #mcfg_spec{mcfgid=McfgId, nls=insert_entries(dict:new(), lists:flatten(Entries2))}.
+    #wrf_spec{id=Id, nls=insert_entries(dict:new(), lists:flatten(Entries2))}.
 
 
 % Insert all nlentries in list into a depth 2 tree of dictionaries for easy access later.
@@ -55,11 +55,11 @@ insert_entries(D, [E=#nlspec_entry{nlid=NLid,name=Name}|R]) ->
 
 
 % Retrieve a list of namelists that exist in the mcfg_spec.
-nlslist(#mcfg_spec{nls=C}) ->
+nlslist(#wrf_spec{nls=C}) ->
     dict:fetch_keys(C).
 
 % Retrieve a namelist specification
-nlspec(Name, #mcfg_spec{nls=C}) ->
+nlspec(Name, #wrf_spec{nls=C}) ->
     #nlspec{id=Name, entries=dict:fetch(Name, C)}.
 
 % Convert the namelist spec to a string representation

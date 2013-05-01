@@ -1,6 +1,11 @@
 
+%
+%  The main process in the application.  Accepts job requests,
+%  starts/monitors/cancels jobs, stores/serves results in various forms.
+%
+%
 
--module(mcfg_srv).
+-module(wrfboss_srv).
 -behaviour(gen_server).
 
 -export([start_link/0,init/1,terminate/2,code_change/3]).

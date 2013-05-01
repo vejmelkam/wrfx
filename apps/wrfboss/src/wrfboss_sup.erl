@@ -1,6 +1,5 @@
 
--module(mcfg_sup).
-
+-module(wrfboss_sup).
 -behaviour(supervisor).
 
 %% API
@@ -24,5 +23,5 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, [?CHILD(mcfg_srv, worker)]} }.
+    {ok, { {one_for_one, 5, 10}, [?CHILD(wrfboss_srv, worker)]} }.
 

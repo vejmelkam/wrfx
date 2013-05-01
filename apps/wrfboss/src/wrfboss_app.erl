@@ -1,7 +1,6 @@
--module(mcfg_app).
+-module(wrfboss_app).
 
 -behaviour(application).
--include("include/mcfg.hrl").
 
 %% Application callbacks
 -export([start/2, stop/1]).
@@ -11,8 +10,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-
-    mcfg_sup:start_link().
+    wrf_sup:start_link().
 
 stop(_State) ->
     ok.

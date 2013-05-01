@@ -1,8 +1,13 @@
 
--module(reg_parser).
--author("vejmelkam@gmail.com").
+%
+%  Parser of WRF registry files - cannot parse all files.
+%  Notably #ifdefs make it barf.
+%
 
--include("include/mcfg.hrl").
+-module(reg_parser).
+-author("Martin Vejmelka <vejmelkam@gmail.com>").
+
+-include("include/wrf_cfg.hrl").
 -export([parse_file/1]).
 
 

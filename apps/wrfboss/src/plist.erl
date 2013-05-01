@@ -1,9 +1,15 @@
 
--module(plist).
--author("vejmelkam@gmail.com").
--include("include/mcfg.hrl").
+%
+%  A list of pairs (tuples) that stores a key-value relationship.
+%  Preferred in some cases over dictionaries to preserve order
+%  of keys (esp. in namelists).
+%
 
--export([set_value/3, get_keys/1, get_value/2, has_key/2]).
+-module(plist).
+-author("Martin Vejmelka <vejmelkam@gmail.com>").
+-include("include/wrf_cfg.hrl").
+
+-export([new/0, set_value/3, get_keys/1, get_value/2, has_key/2]).
 
 
 new() ->

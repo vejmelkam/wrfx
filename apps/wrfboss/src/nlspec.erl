@@ -1,8 +1,13 @@
 
+%
+%  Stores the specification of a single namelist
+%  in a dictionary.
+%
+
 -module(nlspec).
--author("vejmelkam@gmail.com").
--include("include/mcfg.hrl").
--export([id/1, entry_names/1,entries/1, entry/2]).
+-author("Martin Vejmelka <vejmelkam@gmail.com>").
+-include("include/wrf_cfg.hrl").
+-export([id/1, entry_names/1, entries/1, entry/2]).
 
 
 id(#nlspec{id=I}) ->

@@ -1,4 +1,4 @@
-{application, mcfg,
+{application, wrfboss,
  [
   {description, ""},
   {vsn, "1"},
@@ -7,6 +7,6 @@
                   kernel,
                   stdlib
                  ]},
-  {mod, { mcfg_app, []}},
+  {mod, { wrfboss_app, []}},
   {env, []}
  ]}.
