@@ -20,13 +20,13 @@ store(F, NL) ->
     file:write_file(F, R).
 
 namelists(#nllist{nls=NLS}) ->
-    plist:get_keys(NLS).
+    plist:keys(NLS).
 
 namelist(Id, #nllist{nls=NLS}) ->
-    plist:get_value(Id, NLS).
+    plist:getp(Id, NLS).
 
 set_namelist(Id, NL, NLF=#nllist{nls=NLS}) ->
-    NLF#nllist{nls = plist:set_value(Id, NL, NLS)}.
+    NLF#nllist{nls = plist:setp(Id, NL, NLS)}.
 
 
 parse(FName) ->
@@ -34,9 +34,9 @@ parse(FName) ->
 
 parse(FName, Name) ->
     {ok, T} = nlscanner:scan(FName),
-    {ok, NLS} = nlparser:parse(T),
+    {ok, NLS} = nllparser:parse(T),
     #nllist{id=Name, nls=NLS}.
     
 to_text(#nllist{nls=N}) ->
-    S2 = lists:map(fun nlist:to_text/1, N),
+    S2 = lists:map(fun nlist:to_text/1, plist:props(N)),
     lists:flatten(S2).

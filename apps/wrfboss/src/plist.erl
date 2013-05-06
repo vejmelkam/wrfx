@@ -9,36 +9,56 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -include("include/wrf_cfg.hrl").
 
--export([new/0, set_value/3, get_keys/1, get_value/2, has_key/2]).
+-export([new/0, keys/1, props/1,
+	 setp/3, getp/2, get_list/2, contains/2,
+	 update_with/2, update_with/3,
+	 store/2]).
 
 
 new() ->
     [].
 
-get_keys(P) ->
-    lists:map(fun ({Key, _S}) -> Key end, P).
-    
+keys(P) ->
+    [ Key || {Key, _S} <- P ].
 
-set_value(K, V, []) ->
+props(P) ->
+    [ Prop || {_Key, Prop} <- P ].
+
+setp(K, V, []) ->
     [{K,V}];
-set_value(K, V, [{K,_OldV}|P]) ->
+setp(K, V, [{K,_OldV}|P]) ->
     [{K,V}|P];
-set_value(K, V, [{K1,V1}|P]) ->
-    [{K1,V1}|set_value(K, V, P)].
+setp(K, V, [{K1,V1}|P]) ->
+    [{K1,V1}|setp(K, V, P)].
 
 
-get_value(_K, []) ->
+getp(_K, []) ->
     not_found;
-get_value(K, [{K,V}|_P]) ->
+getp(K, [{K,V}|_P]) ->
     V;
-get_value(K, [_E|P]) ->
-    get_value(K, P).
+getp(K, [_E|P]) ->
+    getp(K, P).
 
 
-has_key(_K, []) ->
+get_list(K, P) ->
+    [ getp(X, P) || X <- K ].
+
+
+contains(_K, []) ->
     false;
-has_key(K, [{K,_V}|_P]) ->
+contains(K, [{K,_V}|_P]) ->
     true;
-has_key(K, [_E|P]) ->
-    has_key(K, P).
+contains(K, [_E|P]) ->
+    contains(K, P).
+
+
+update_with(UP, P) ->
+    lists:foldl(fun ({K,V}, Acc) -> setp(K, V, Acc) end, P, UP).
+
+update_with(KL, VL, P) ->
+    update_with(lists:zip(KL, VL), P).
+
+
+store(F, P) ->
+    file:write_file(F, P).
 

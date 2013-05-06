@@ -1,14 +1,17 @@
 
 -module(wrf_reg).
--author("vejmelkam@gmail.com").
-
+-author("Martin Vejmelka <vejmelkam@gmail.com>").
 -include("include/wrf_cfg.hrl").
--export([default_registry_files/0, create_profile_from_reg/2, create_profile_from_reg/3,nlslist/1,nlspec/2,to_string/1,from_string/1,load/1]).
+-export([default_registry_files/0, create_profile_from_reg/2, create_profile_from_reg/3,
+	 nlslist/1, nlspec/2, to_string/1, from_string/1, load/1]).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
 
 
 % Returns the standard registry list that should be parsed to generate
 % configuration information for WRF.
-%
 default_registry_files() ->
     [ 'Registry.EM_COMMON',
       'registry.dimspec',
@@ -78,3 +81,14 @@ load(F) ->
     {ok, B} = file:read_file(F),
     S = binary:bin_to_list(B),
     from_string(S).
+
+
+-ifdef(TEST).
+
+read_nlspec_test() ->
+    WRFDir = "/home/martin/Projects/wrf-fire/WRFV3/Registry",
+    MS = create_profile_from_reg(WRFDir, vanilla_wrf_v34),
+    TCS = nlspec("time_control", MS),
+    io:format("~p~n", [nlspec:entries(TCS)]).
+
+-endif.

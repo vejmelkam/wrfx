@@ -23,7 +23,7 @@ scan_lines([], T, N) ->
     lists:reverse([{'$end',N}|T]);
 scan_lines([L|R], T, N) ->
     % scan tokens on this line (which are separated by whitespace, strings are inside ' pairs)
-    {ok, RE} = re:compile("(/)|(&)|(=)|([-\\w\\.]+)|'(.+)'|(,)"),
+    {ok, RE} = re:compile("(/)|(&)|(=)|([-\\w\\.]+)|'(.+)'|(,)|([ \t]+)"),
     LT = re:split(L, RE, [{return, list}]),
     LF = lists:filter(fun valid_token/1, LT),
     T2 = lists:foldl(fun (X, A) -> [process_token(X,N)|A] end, T, LF),
