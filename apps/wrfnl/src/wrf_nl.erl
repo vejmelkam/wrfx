@@ -8,19 +8,20 @@
 %  a configuration object that summarizes relevant parts of the namelist.
 %
 
--module(wrf_cfg).
+-module(wrf_nl).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -include("include/wrf_cfg.hrl").
--export([read_wrf_config/1, write_wrf_config/2,
-	 write_time_range/2, write_io_policy/2,
-	 read_time_range/2,read_io_policy/2,read_domain_info/2]).
+-export([read_config/1, write_config/2,
+	 read_time_range/2, write_time_range/2,
+	 read_io_policy/2, write_io_policy/2,
+	 read_domain_info/2]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
 
-read_wrf_config(NL) ->
+read_config(NL) ->
     % read in configuration parts we need to know to manipulate this NL further
 
     TC = nllist:namelist("time_control", NL),
@@ -49,7 +50,7 @@ read_io_policy(TC, P) ->
     plist:update_with([grib_interval_seconds, restart_interval_min, history_interval_min, frames_per_outfile], E, P).
 
 
-write_wrf_config(Cfg, NL) ->
+write_config(Cfg, NL) ->
     NL2 = write_time_range(Cfg, NL),
     write_io_policy(Cfg, NL2).
 
@@ -144,13 +145,13 @@ config_read_write_wrf_test() ->
 
     % load a namelist from WRF v3.4
     NLS = nllist:parse("../data/namelist.input"),
-    P = wrf_cfg:read_wrf_config(NLS),
+    P = read_config(NLS),
 
     % construct a new configuration (this is a plist)
     P2 = [ {dt_from, {{2012, 6, 1}, {0, 0, 0}}}, {dt_to, {{2012, 6, 3}, {0, 0, 0}}} ],
     Wcfg = #wrf_cfg{cfg=plist:update_with(P2, P), wrf_spec=MS},
 
-    NLS2 = wrf_cfg:write_time_range(Wcfg, NLS),
+    NLS2 = write_time_range(Wcfg, NLS),
     T = nllist:to_text(NLS2),
     file:write_file("../data/namelist.input.constructed", T).
 

@@ -1,4 +1,4 @@
-{application, wrfboss,
+{application, wrfnl,
  [
   {description, ""},
   {vsn, "1"},
@@ -7,6 +7,5 @@
                   kernel,
                   stdlib
                  ]},
-  {mod, { wrfboss_app, []}},
   {env, []}
  ]}.

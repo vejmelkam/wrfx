@@ -13,8 +13,6 @@
 -record(wrf_cfg,
 	{mcfgid,         % id of the configuration
 	 cfg,            % a dictionary of pairs storing wrfx configuration
-	 wrf_nl_src,     % source WRF namelist
-	 wps_nl_src,     % source WPS namelist
 	 wrf_spec        % id of namelist specification (depends on WRF version)
 	}). 
 
