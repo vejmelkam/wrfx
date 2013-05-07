@@ -19,8 +19,9 @@ execute_plan(Plan) ->
 
 
 execute_plan([], Log) ->
-    {success, [], lists:reverse(Log)};
+    {success, lists:reverse(Log)};
 execute_plan([MFA|Rest], Log) ->
+    io:format("have argument: ~p~n", [MFA]),
     {M, F, A} = MFA,
     case apply(M, F, A) of
 	{success, Text} ->
@@ -33,11 +34,23 @@ execute_plan([MFA|Rest], Log) ->
 
 -ifdef(TEST).
 
-execute_clone_dir_plan() ->
+execute_clone_dir_plan_test() ->
     A = [ {src_dir, "/home/martin/Temp/t1"},
 	  {dst_dir, "/home/martin/Temp/t2"},
 	  {with_files, ["file1", "file2", "readme"]} ],
     P = clone_dir_planner:make_plan(A),
-    R = execute_plan(P).
+    case execute_plan(P) of
+	{success, Log} ->
+	    file:write_file("planner.log", io_lib:format("success~n~p~n", [Log]));
+	{failure, MFA, Text, _R, Log} ->
+	    file:write_file("planner.log", io_lib:format("failure-at~n~p~nwith text~p~n~p~n", [MFA, Text, Log]))
+    end,
+
+    ?assert(filelib:is_dir("/home/martin/Temp/t2")),
+    ?assert(filelib:is_regular("/home/martin/Temp/t2/file1")),
+    ?assert(filelib:is_regular("/home/martin/Temp/t2/file2")),
+    ?assert(filelib:is_regular("/home/martin/Temp/t2/readme")),
+    os:cmd("rm -rf /home/martin/Temp/t2").
+    
 
 -endif.

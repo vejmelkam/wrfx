@@ -24,7 +24,7 @@ make_plan(Args) ->
 
     % construct plan
     [ { filesys_tasks, check_dir_exists, [Src]},
-      { filesys_tasks, create_dir, [Dst]},
+      { filesys_tasks, create_dir, [Dst]} |
       lists:reverse(lists:foldl(fun(F, A) -> [make_symlink_task(Src, Dst, F)|A] end, [], Files)) ].
 
 
