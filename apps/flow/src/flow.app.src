@@ -1,0 +1,12 @@
+{application, flow,
+ [
+  {description, "Workflow manager"},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { flow_app, []}},
+  {env, []}
+ ]}.
