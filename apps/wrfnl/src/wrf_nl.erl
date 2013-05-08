@@ -137,6 +137,10 @@ expand_and_check(V, Len) ->
 
 -ifdef(TEST).
 
+second_test() ->
+    plist:new().
+
+
 config_read_write_wrf_test() ->
    
     % construct a WRFv3.4 registry profile object
@@ -149,11 +153,10 @@ config_read_write_wrf_test() ->
 
     % construct a new configuration (this is a plist)
     P2 = [ {dt_from, {{2012, 6, 1}, {0, 0, 0}}}, {dt_to, {{2012, 6, 3}, {0, 0, 0}}} ],
-    Wcfg = #wrf_cfg{cfg=plist:update_with(P2, P), wrf_spec=MS},
+    Wcfg = #wrf_cfg{cfg = plist:update_with(P2, P), wrf_spec = MS},
 
     NLS2 = write_time_range(Wcfg, NLS),
     T = nllist:to_text(NLS2),
     file:write_file("../data/namelist.input.constructed", T).
-
 
 -endif.

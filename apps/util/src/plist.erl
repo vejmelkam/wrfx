@@ -7,9 +7,8 @@
 
 -module(plist).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--include("include/wrf_cfg.hrl").
 
--export([new/0, keys/1, props/1,
+-export([new/0, keys/1, props/1, 
 	 setp/3, getp/2, get_list/2, contains/2,
 	 update_with/2, update_with/3,
 	 store/2]).
