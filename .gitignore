@@ -3,3 +3,8 @@ deps
 *.o
 *.beam
 *.plt
+*~
+ebin
+apps/wrfnl/data
+apps/wrfnl/src/nllparser.erl
+apps/wrfnl/logs
