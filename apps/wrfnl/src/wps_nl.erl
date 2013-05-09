@@ -29,14 +29,14 @@ read_share(Sh, P) ->
     TE = esmf:parse_time(lists:nth(1, nlist:entry("end_date", Sh))),
     IS = lists:nth(1, nlist:entry("interval_seconds", Sh)),
     ND = lists:nth(1, nlist:entry("max_dom", Sh)),
-
     plist:update_with(P, [{dt_from, TS}, {dt_to, TE}, {grib_interval_seconds, IS}, {num_domains, ND}]).
 
 
 write_config(Cfg, NL) ->
     write_share(Cfg, NL).
 
-write_share(#wrf_cfg{cfg=Cfg}, NL) ->
+
+write_share(Cfg, NL) ->
 
     % both of these must be standard erlang dates
     Ts = plist:getp(dt_from, Cfg),

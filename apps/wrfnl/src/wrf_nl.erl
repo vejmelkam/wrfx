@@ -55,13 +55,14 @@ write_config(Cfg, NL) ->
     write_io_policy(Cfg, NL2).
 
 
-write_time_range(#wrf_cfg{cfg=Cfg, wrf_spec=Spec}, NL) ->
+write_time_range(Cfg, NL) ->
 
     % both of these must be standard erlang dates
     Ts = {{Sy, Sm, Sd}, {Shr, Smin, Ssec}} = plist:getp(dt_from, Cfg),
     Te = {{Ey, Em, Ed}, {Ehr, Emin, Esec}} = plist:getp(dt_to, Cfg),
     {Rdays, {Rhrs, Rmins, Rsecs}} = calendar:time_difference(Ts, Te),
 
+    Spec = plist:getp(nl_spec, Cfg),
     TC = nllist:namelist("time_control", NL),
 
     TC2 = update_namelist([{"run_days", Rdays}, {"run_hours", Rhrs}, {"run_minutes", Rmins}, {"run_seconds", Rsecs},
@@ -77,20 +78,25 @@ write_time_range(#wrf_cfg{cfg=Cfg, wrf_spec=Spec}, NL) ->
     
 
 
-write_io_policy(#wrf_cfg{cfg=Cfg, wrf_spec=MS}, NL) ->
+write_io_policy(Cfg, NL) ->
+
+    TC = nllist:namelist("time_control", NL),
 
     GS = plist:getp(grib_interval_seconds, Cfg),
     HI = plist:getp(history_interval_min, Cfg),
     FO = plist:getp(frames_per_outfile, Cfg),
     RI = plist:getp(restart_interval_min, Cfg),
+    Spec = plist:getp(nl_spec, Cfg),
 
-    update_namelist([{"interval_seconds", GS},
-		     {"restart_interval", RI},
-		     {"history_interval", HI},
-		     {"frames_per_outfile", FO}],
-		    NL,
-		    Cfg,
-		    wrf_reg:nlspec("time_control", MS)).
+    TC2 = update_namelist([{"interval_seconds", GS},
+			   {"restart_interval", RI},
+			   {"history_interval", HI},
+			   {"frames_per_outfile", FO}],
+			  TC,
+			  Cfg,
+			  wrf_reg:nlspec("time_control", Spec)),
+
+    nllist:set_namelist("time_control", TC2, NL).
 
 update_namelist([], NL, _Cfg, _NLSpec) ->
     NL;

@@ -11,112 +11,33 @@
 -module(wps_exec).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -include("include/flow.hrl").
--export([run_wps/1]).
+-export([make_exec_plan/1]).
 
 
 make_exec_plan(Args) ->
 
-    WPSDir = plist:getp(wps_dir, Args),        % directory with an installation of WPS
-    ExecDir = plist:getp(exec_dir, Args),      % directory in which WPS step is supposed to run
+    RootDir = plist:getp(wrf_root_dir, Args),  % root of WRF installation
+    WPSDir = filename:join(RootDir, "WPS"),    % directory with an installation of WPS
+    ExecDir = plist:getp(wps_exec_dir, Args),  % directory in which WPS step is supposed to run
     Vtable = plist:getp(vtable_file, Args),    % Vtable file relative to WPS directory
-    WPSNL = plist:getp(wps_nl, Args),
-    WRFNL = plist:getp(wrf_nl, Args),
+    WPSNL = plist:getp(wps_nl, Args),          % namelist for wps
+    GRIBFiles = plist:getp(grib_files, Args),  % list of GRIB files
 
-    Files = [Vtable, "geogrid.exe", "geogrid", "metgrid.exe", "metgrid", "ungrib.exe", "ungrib"],
-
+    Files = ["geogrid.exe", "geogrid", "metgrid.exe", "metgrid", "ungrib.exe", "ungrib"],
 
     T = [ {filesys_tasks, dir_exists, [WPSDir]},
 	  {filesys_tasks, create_dir, [ExecDir]},
 	  [ { filesys_tasks, create_symlink, [filename:join(WPSDir, F), filename:join(ExecDir, F)] } || F <- Files ],
-	  {filesys_tasks, write_file, [nllist:to_text(WPSNL), filename:join(ExecDir, "namelist.wps")]},
-	  {exec_tasks, run_scan_output, filename:join(ExecDir, "geogrid.exe"), "Successful"},
+	  { filesys_tasks, create_symlink, [filename:join(WPSDir, Vtable), filename:join(ExecDir, "Vtable")] },
+	  {filesys_tasks, write_file, [filename:join(ExecDir, "namelist.wps"), nllist:to_text(WPSNL)]},
+	  {exec_tasks, run_scan_output, [ExecDir, "./geogrid.exe", "Successful"]},
 	  [ { filesys_tasks, create_symlink, [X, filename:join(ExecDir, Y)]} || {X,Y} <- make_grib_names(GRIBFiles) ],
-	  {exec_tasks, run_scan_output, filename:join(ExecDir, "ungrib.exe"), "Successful"},
-	  {exec_tasks, run_scan_output, filename:join(ExecDir, "metgrid.exe"), "Succesful"} ],
+	  {exec_tasks, run_scan_output, [ExecDir, "./ungrib.exe", "Successful"]},
+	  {exec_tasks, run_scan_output, [ExecDir, "./metgrid.exe", "Successful"]} ],
 	  
-    P = #plan{id=wps_exec_plan, tasks=lists:flatten(T)}.
+    #plan{id=wps_exec_plan, tasks=lists:flatten(T)}.
     
 
-run_wps(Args) ->
-
-    WPSDir = plist:getp(wps_dir, Args),        % directory with an installation of WPS
-    
-    % check if WPS dir exists
-    T = [ {filesys_tasks, dir_exists, [WPSDir]} ],
-    case plan_runner:execute_plan(#plan{id=wps_check_plan, tasks=T}) of
-	{success, _Log} ->
-	    run_wps(clone_dir, Args);
-	X ->
-	    X
-    end.
-
-
-run_wps(clone_dir, Args) ->
-
-    WPSDir = plist:getp(wps_dir, Args),        % directory with an installation of WPS
-    ExecDir = plist:getp(exec_dir, Args),      % directory in which WPS step is supposed to run
-    Vtable = plist:getp(vtable_file, Args),    % Vtable file relative to WPS directory
-
-    Files = [Vtable, "geogrid.exe", "geogrid", "metgrid.exe", "metgrid", "ungrib.exe", "ungrib"],
-
-    P = clone_dir_planner:make_exec_plan(WPSDir, ExecDir, Files),
-    case plan_runner:execute_plan(P) of
-	{success, _Log} ->
-	    run_wps(store_namelist, Args);
-	X ->
-	    X
-    end;
-run_wps(store_namelist, Args) ->
-    ExecDir = plist:getp(exec_dir, Args),      % directory in which WPS step is supposed to run
-    WPSNL = plist:getp(wps_nl, Args),          % the WPS namelist that is to be stored in namelist.wps
-    case filesys_tasks:write_file(filename:join(ExecDir, "namelist.wps"), WPSNL) of
-	ok ->
-	    run_wps(run_geogrid, Args);
-	X ->
-	    X
-    end;
-run_wps(run_geogrid, Args) ->
-    ExecDir = plist:getp(exec_dir, Args),      % directory in which WPS step is supposed to run
-    Output = os:cmd(filename:join(ExecDir, "geogrid.exe")),
-    case string:str("Successful", Output) of
-	0 ->
-	    {failure, io_lib:format("geogrid failed, output ~p", Output)};
-	_ ->
-	    run_wps(link_gribs, Args)
-    end;
-run_wps(link_gribs, Args) ->
-    GRIBFiles = plist:getp(grib_files, Args),  % the GRIB files that will be used as input to ungrib.exe
-    ExecDir = plist:getp(exec_dir, Args),      % directory in which WPS step is supposed to run
-    
-    T = [ { filesys_tasks, create_symlink, [X, filename:join(ExecDir, Y)]} || {X,Y} <- make_grib_names(GRIBFiles) ],
-    case plan_runner:execute_plan(#plan{id=wps_link_gribs, tasks=T}) of
-	{success, _Log} ->
-	    run_wps(run_ungrib, Args);
-	X ->
-	    X
-    end;
-run_wps(run_ungrib, Args) ->
-    ExecDir = plist:getp(exec_dir, Args),      % directory in which WPS step is supposed to run
-    Output = os:cmd(filename:join(ExecDir, "ungrib.exe")),
-    case string:str("Successful", Output) of
-	0 ->
-	    {failure, io_lib:format("ungrib stage failed, output ~p", Output)};
-	_ ->
-	    run_wps(run_metgrid, Args)
-    end;  
-run_wps(run_metgrid, Args) ->
-    ExecDir = plist:getp(exec_dir, Args),      % directory in which WPS step is supposed to run
-    Output = os:cmd(filename:join(ExecDir, "metgrid.exe")),
-    case string:str("Successful", Output) of
-	0 ->
-	    {failure, io_lib:format("metgrid stage failed, output ~p", [Output])};
-	_ ->
-	    {success, "WPS execution successful."}
-    end.
-    
-			 
-
-    
 make_grib_names(GF) ->
     make_names(GF, $A, $A, $A, []).
 

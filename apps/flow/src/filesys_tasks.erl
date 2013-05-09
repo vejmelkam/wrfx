@@ -31,8 +31,8 @@ create_symlink(Existing, New) ->
     end.
 
 
-write_file(Content, Fname) ->
-    case file:write_file(Content, Fname) of
+write_file(Fname, Content) ->
+    case file:write_file(Fname, Content) of
 	ok ->
 	    {success, io_lib:format("content written to [~p].~n", [Fname])};
 	{error, R} ->

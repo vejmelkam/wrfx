@@ -37,7 +37,9 @@ create_profile_from_reg(Dir,Flist,Id) ->
     % add some entries that are in io_boilerplate registry which has ifdefs and whatnot
     Entries2 = [ #nlspec_entry{nlid="time_control", name="restart", type=logical, mult=1},
                  #nlspec_entry{nlid="time_control", name="restart_interval", type=integer, mult=1},
-                 #nlspec_entry{nlid="time_control", name="history_interval", type=integer, mult=1} | Entries ],
+                 #nlspec_entry{nlid="time_control", name="history_interval", type=integer, mult=1},
+		 #nlspec_entry{nlid="time_control", name="frames_per_outfile", type=integer, mult=1}
+		 | Entries ],
 
     #wrf_spec{id=Id, nls=insert_entries(dict:new(), lists:flatten(Entries2))}.
 

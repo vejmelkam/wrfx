@@ -22,7 +22,7 @@ execute_plan(#plan{tasks=Plan}) ->
 execute_plan([], Log) ->
     {success, lists:reverse(Log)};
 execute_plan([MFA|Rest], Log) ->
-    io:format("have argument: ~p~n", [MFA]),
+%    io:format("have argument: ~p~n", [MFA]),
     {M, F, A} = MFA,
     case apply(M, F, A) of
 	{success, Text} ->
