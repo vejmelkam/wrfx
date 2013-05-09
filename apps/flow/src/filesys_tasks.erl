@@ -1,11 +1,10 @@
 
 -module(filesys_tasks).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
+-export([dir_exists/1, create_dir/1, create_symlink/2, write_file/2, clone_dir_with_files/3]).
 
--export([check_dir_exists/1, create_dir/1, create_symlink/2]).
 
-
-check_dir_exists(D) ->
+dir_exists(D) ->
     case filelib:is_dir(D) of
 	true ->
 	    {success, io_lib:format("source directory ~p exists.", [D])};
@@ -30,3 +29,17 @@ create_symlink(Existing, New) ->
 	{error, E} ->
 	    {failure, io_lib:format("failed to create symlink [~p] -> [~p] with error [~p].~n", [New, Existing, E])}
     end.
+
+
+write_file(Content, Fname) ->
+    case file:write_file(Content, Fname) of
+	ok ->
+	    {success, io_lib:format("content written to [~p].~n", [Fname])};
+	{error, R} ->
+	    {failure, io_lib:format("could not write to [~p] with error [~p].~n", [Fname, R])}
+    end.
+
+
+clone_dir_with_files(Src, Dst, Files) ->
+    P = clone_dir_planner:make_exec_plan([ {src_dir, Src}, {dst_dir, Dst}, {with_files, Files} ]),
+    plan_runner:execute_plan(P).

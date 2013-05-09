@@ -8,13 +8,14 @@
 -module(plan_runner).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -export([execute_plan/1]).
+-include("include/flow.hrl").
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
 
-execute_plan(Plan) ->
+execute_plan(#plan{tasks=Plan}) ->
     execute_plan(Plan, []).
 
 
