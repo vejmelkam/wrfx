@@ -2,7 +2,7 @@
 -module(clone_dir_planner).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -include("include/flow.hrl").
--export([make_exec_plan/1, make_check_plan/1]).
+-export([make_exec_plan/1, make_check_plan/1, make_cleanup_plan/1]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
