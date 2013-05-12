@@ -1,6 +1,6 @@
-{application, retr,
+{application, rnrs,
  [
-  {description, "Downloading service that retrieves external data."},
+  {description, "Resource name resolution service - computes URLs and storage ids of required input files."},
   {vsn, "1"},
   {registered, []},
   {applications, [

@@ -1,11 +1,17 @@
 
 %
 %  This subsystem runs the WPS module assuming that
+%
 %  - a workspace is available (exec_dir can be created)
 %  - GRIB files are available
 %  - the Vtable file is known for the GRIB data
 %  - a namelist for WPS is available
 %  - an installation of WPS exists in wps_dir
+%  - the WRF root directory contains a valid WPS/WRF setup (GEOGRID.TBL pointing to the right file, etc.)
+%
+%
+%  The plan produces in the exec_dir met_em* files which must
+%  be linked into the directory in which wrf.exe is executed.
 %
 
 -module(wps_exec).
@@ -16,13 +22,13 @@
 
 make_exec_plan(Args) ->
 
-    RootDir = plist:getp(wrf_root_dir, Args),  % root of WRF installation
-    WPSDir = filename:join(RootDir, "WPS"),    % directory with an installation of WPS
-    ExecDir = plist:getp(wps_exec_dir, Args),  % directory in which WPS step is supposed to run
-    Vtable = plist:getp(vtable_file, Args),    % Vtable file relative to WPS directory
-    WPSNL = plist:getp(wps_nl, Args),          % namelist for wps
-    GRIBFiles = plist:getp(grib_files, Args),  % list of GRIB files
+    WPSDir = filename:join(plist:getp(wrf_root_dir, Args), "WPS"),  % directory with an installation of WPS
+    ExecDir = plist:getp(wps_exec_dir, Args),                       % directory in which WPS step is supposed to run
+    Vtable = plist:getp(vtable_file, Args),                         % Vtable file relative to WPS directory
+    WPSNL = plist:getp(wps_nl, Args),                               % namelist for wps
+    GRIBFiles = plist:getp(grib_files, Args),                       % list of GRIB files
 
+    % files that must be symlinked from the workspace directory
     Files = ["geogrid.exe", "geogrid", "metgrid.exe", "metgrid", "ungrib.exe", "ungrib"],
 
     T = [ {filesys_tasks, dir_exists, [WPSDir]},

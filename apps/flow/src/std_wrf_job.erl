@@ -5,7 +5,6 @@
 
 -export([run_job/1, test_job/0]).
 
-
 %
 %  Required inputs in the Cfg object
 %
@@ -23,10 +22,6 @@ test_job() ->
     WRFTempl = nllist:parse(filename:join(WRFDir, "WRFV3/run/namelist.input")),
     Cfg1 = wrf_nl:read_config(WRFTempl),
 
-    Files = [ "nam.t00z.awphys00.grb2.tm00", "nam.t00z.awphys01.grb2.tm00",
-	      "nam.t00z.awphys02.grb2.tm00", "nam.t00z.awphys03.grb2.tm00" ],
-    F2 = lists:map(fun(X) -> filename:join("/home/martin/Projects/GRIB/NAM_20130501", X) end, Files),
-
     NLSpec = wrf_reg:create_profile_from_reg(filename:join(WRFDir, "WRFV3/Registry"), vanilla_wrf_v34),
 
     Cfg = plist:update_with([ {wrf_root_dir, WRFDir},
@@ -38,6 +33,10 @@ test_job() ->
 			      {dt_to, {{2013, 5, 1}, {3, 0, 0}}},
 			      {vtable_file, "ungrib/Variable_Tables/Vtable.NAM"},
 			      {grib_files, F2} ], Cfg1),
+
+    Files = [ "nam.t00z.awphys00.grb2.tm00", "nam.t00z.awphys01.grb2.tm00",
+	      "nam.t00z.awphys02.grb2.tm00", "nam.t00z.awphys03.grb2.tm00" ],
+    F2 = lists:map(fun(X) -> filename:join("/home/martin/Projects/GRIB/NAM_20130501", X) end, Files),
 
     % delete the test dir
     os:cmd(["rm -rf ", plist:getp(wps_exec_dir, Cfg)]),
