@@ -1,0 +1,12 @@
+{application, jobs,
+ [
+  {description, "Some standard WRF/WPS/WRF-Fire jobs support."},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { jobs_app, []}},
+  {env, []}
+ ]}.
