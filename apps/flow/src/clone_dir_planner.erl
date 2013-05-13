@@ -17,7 +17,6 @@ make_check_plan(Args) ->
 	  tasks = [ {filesys_tasks, check_dir_exists, [Src] } ]}.
 
 
-
 make_exec_plan(Args) ->
     
     % retrieve input arguments from plist

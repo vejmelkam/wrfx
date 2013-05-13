@@ -1,7 +1,7 @@
 
 %
 %  ESMF time module: read/write ESMF time.
-%
+%  ESMF = Earth systems modelling framework
 %
 
 -module(esmf).

@@ -39,7 +39,7 @@ execute_clone_dir_plan_test() ->
     A = [ {src_dir, "/home/martin/Temp/t1"},
 	  {dst_dir, "/home/martin/Temp/t2"},
 	  {with_files, ["file1", "file2", "readme"]} ],
-    P = clone_dir_planner:make_plan(A),
+    P = clone_dir_planner:make_exec_plan(A),
     case execute_plan(P) of
 	{success, Log} ->
 	    file:write_file("planner.log", io_lib:format("success~n~p~n", [Log]));

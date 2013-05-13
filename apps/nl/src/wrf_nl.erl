@@ -158,8 +158,8 @@ config_read_write_wrf_test() ->
     P = read_config(NLS),
 
     % construct a new configuration (this is a plist)
-    P2 = [ {dt_from, {{2012, 6, 1}, {0, 0, 0}}}, {dt_to, {{2012, 6, 3}, {0, 0, 0}}} ],
-    Wcfg = #wrf_cfg{cfg = plist:update_with(P2, P), wrf_spec = MS},
+    P2 = [ {dt_from, {{2012, 6, 1}, {0, 0, 0}}}, {dt_to, {{2012, 6, 3}, {0, 0, 0}}}, {nl_spec, MS} ],
+    Wcfg = plist:update_with(P2, P),
 
     NLS2 = write_time_range(Wcfg, NLS),
     T = nllist:to_text(NLS2),

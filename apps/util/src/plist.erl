@@ -14,6 +14,11 @@
 	 store/2]).
 
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
+
 new() ->
     [].
 
@@ -61,3 +66,11 @@ update_with(KL, VL, P) ->
 store(F, P) ->
     file:write_file(F, P).
 
+
+-ifdef(TEST).
+
+make_plist_test() ->
+    ?assert([] == plist:new()),
+    ?assert([{test, 1}] =:= plist:update_with([{test,1}], [])).
+
+-endif.
