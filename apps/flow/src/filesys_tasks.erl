@@ -1,7 +1,8 @@
 
 -module(filesys_tasks).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([dir_exists/1, create_dir/1, create_symlink/2, write_file/2, clone_dir_with_files/3]).
+-export([dir_exists/1, create_dir/1, create_symlink/2,
+	 write_file/2, delete_file/1]).
 
 
 dir_exists(D) ->
@@ -40,6 +41,12 @@ write_file(Fname, Content) ->
     end.
 
 
-clone_dir_with_files(Src, Dst, Files) ->
-    P = clone_dir_planner:make_exec_plan([ {src_dir, Src}, {dst_dir, Dst}, {with_files, Files} ]),
-    plan_runner:execute_plan(P).
+delete_file(Fname) ->
+    case file:delete(Fname) of
+	ok ->
+	    {success, io_lib:format("file [~p] deleted.~n", [Fname])};
+	{error, enoent} ->
+	    {success, io_lib:format("file [~p] is non-existent, skipping.~n", [Fname])};
+	{error, E} ->
+	    {failure, io_lib:format("error [~p] encountered while deleting file [~p]~n", [E, Fname])}
+    end.

@@ -41,7 +41,7 @@ make_exec_plan(Args) ->
 	  {exec_tasks, run_scan_output, [ExecDir, "./ungrib.exe", "Successful"]},
 	  {exec_tasks, run_scan_output, [ExecDir, "./metgrid.exe", "Successful"]} ],
 	  
-    #plan{id=wps_exec_plan, tasks=lists:flatten(T)}.
+    #plan{id=wps_exec, tasks=lists:flatten(T)}.
     
 
 make_grib_names(GF) ->
