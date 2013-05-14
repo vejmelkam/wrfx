@@ -29,7 +29,7 @@ read_share(Sh, P) ->
     TE = esmf:parse_time(lists:nth(1, nlist:entry("end_date", Sh))),
     IS = lists:nth(1, nlist:entry("interval_seconds", Sh)),
     ND = lists:nth(1, nlist:entry("max_dom", Sh)),
-    plist:update_with(P, [{dt_from, TS}, {dt_to, TE}, {grib_interval_seconds, IS}, {num_domains, ND}]).
+    plist:update_with(P, [{wps_from, TS}, {wps_to, TE}, {grib_interval_seconds, IS}, {num_domains, ND}]).
 
 
 write_config(Cfg, NL) ->
@@ -39,8 +39,8 @@ write_config(Cfg, NL) ->
 write_share(Cfg, NL) ->
 
     % both of these must be standard erlang dates
-    Ts = plist:getp(dt_from, Cfg),
-    Te = plist:getp(dt_to, Cfg),
+    Ts = plist:getp(wps_from, Cfg),
+    Te = plist:getp(wps_to, Cfg),
     IS = plist:getp(grib_interval_seconds, Cfg),
     ND = plist:getp(num_domains, Cfg),
 
@@ -69,7 +69,7 @@ config_read_write_wps_test() ->
     plist:store("../data/namelist.wps.cfg", P),
 
     % construct a new configuration (this is a plist)
-    P2 = [ {dt_from, {{2012, 6, 1}, {0, 0, 0}}}, {dt_to, {{2012, 6, 3}, {0, 0, 0}}} ],
+    P2 = [ {wps_from, {{2012, 6, 1}, {0, 0, 0}}}, {wps_to, {{2012, 6, 3}, {0, 0, 0}}} ],
     Wcfg = plist:update_with(P2, P),
 
     NLS2 = write_config(Wcfg, NLS),

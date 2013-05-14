@@ -2,11 +2,11 @@
  [
   {description, ""},
   {vsn, "1"},
-  {registered, []},
+  {registered, [stor]},
   {applications, [
                   kernel,
                   stdlib
                  ]},
   {mod, { stor_app, []}},
-  {env, []}
+  {env, [ {storage_root, "/home/martin/Temp/stor"} ]}
  ]}.

@@ -16,4 +16,4 @@ parse_time([Y1,Y2,Y3,Y4,$-,M1,M2,$-,D1,D2,$_,H1,H2,$:,MIN1,MIN2,$:,S1,S2]) ->
 
 
 time_to_string({{Y,Mo,D}, {H,Min,S}}) ->
-    io_lib:format("~4..0B-~2..0B-~2..0B_~2..0B:~2..0B:~2..0B", [Y,Mo,D,H,Min,S]).
+    lists:flatten(io_lib:format("~4..0B-~2..0B-~2..0B_~2..0B:~2..0B:~2..0B", [Y,Mo,D,H,Min,S])).

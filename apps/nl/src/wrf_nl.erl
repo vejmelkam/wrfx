@@ -38,7 +38,7 @@ read_time_range(TC, P) ->
     TE = {list_to_tuple(nlist:entries(["end_year", "end_month", "end_day"], TC)),
 	  list_to_tuple(nlist:entries(["end_hour", "end_minute", "end_second"], TC))},
 
-    plist:update_with(P, [{dt_from, TS}, {dt_to, TE}]).
+    plist:update_with(P, [{wrf_from, TS}, {wrf_to, TE}]).
 
 
 read_domain_info(Dom, P) ->
@@ -58,8 +58,8 @@ write_config(Cfg, NL) ->
 write_time_range(Cfg, NL) ->
 
     % both of these must be standard erlang dates
-    Ts = {{Sy, Sm, Sd}, {Shr, Smin, Ssec}} = plist:getp(dt_from, Cfg),
-    Te = {{Ey, Em, Ed}, {Ehr, Emin, Esec}} = plist:getp(dt_to, Cfg),
+    Ts = {{Sy, Sm, Sd}, {Shr, Smin, Ssec}} = plist:getp(wrf_from, Cfg),
+    Te = {{Ey, Em, Ed}, {Ehr, Emin, Esec}} = plist:getp(wrf_to, Cfg),
     {Rdays, {Rhrs, Rmins, Rsecs}} = calendar:time_difference(Ts, Te),
 
     Spec = plist:getp(nl_spec, Cfg),
@@ -158,7 +158,7 @@ config_read_write_wrf_test() ->
     P = read_config(NLS),
 
     % construct a new configuration (this is a plist)
-    P2 = [ {dt_from, {{2012, 6, 1}, {0, 0, 0}}}, {dt_to, {{2012, 6, 3}, {0, 0, 0}}}, {nl_spec, MS} ],
+    P2 = [ {wrf_from, {{2012, 6, 1}, {0, 0, 0}}}, {wrf_to, {{2012, 6, 3}, {0, 0, 0}}}, {nl_spec, MS} ],
     Wcfg = plist:update_with(P2, P),
 
     NLS2 = write_time_range(Wcfg, NLS),

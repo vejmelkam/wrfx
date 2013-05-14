@@ -8,20 +8,20 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -export([dt_shift_hours/2, dt_shift_days/2, d_shift_days/2, 
 	 dt_hours_since/2,
-	 dt_round_hour/2,
-	 compare_dt/2, compare_dates/2]).
+	 dt_round_hours/2,
+	 is_before/2, is_after/2, compare/2]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
 
-dt_round_hour({Date, {H, _M, _S}}, down) ->
+dt_round_hours({Date, {H, _M, _S}}, down) ->
     {Date, {H, 0, 0}};
-dt_round_hour(DT={_Date, {_H, 0, 0}}, up) ->
+dt_round_hours(DT={_Date, {_H, 0, 0}}, up) ->
     DT;
-dt_round_hour(DT, up) ->
-    dt_shift_hours(dt_round_hour(DT, down), 1).
+dt_round_hours(DT, up) ->
+    dt_shift_hours(dt_round_hours(DT, down), 1).
 
 
 
@@ -43,33 +43,24 @@ dt_hours_since(DTFrom, DTTo) ->
     (DTSTo - DTSFrom) div 3600.
 
 
-compare_dates(D1, D2) ->
-    compare_tuples_lex(D1, D2).
+is_before({{Y1,M1,D1}, {H1,MI1,S1}}, {{Y2,M2,D2}, {H2,MI2,S2}}) ->
+    {Y1,M1,D1,H1,MI1,S1} < {Y2,M2,D2,H2,MI2,S2}.
 
-compare_dt({D1,T1}, {D2, T2}) ->
-    case compare_tuples_lex(D1, D2) of
-	equal ->
-	    compare_tuples_lex(T1, T2);
-	X ->
-	    X
+is_after({{Y1,M1,D1}, {H1,MI1,S1}}, {{Y2,M2,D2}, {H2,MI2,S2}}) ->
+    {Y1,M1,D1,H1,MI1,S1} > {Y2,M2,D2,H2,MI2,S2}.
+
+compare(DT1, DT2) ->
+    case is_before(DT1, DT2) of
+	true ->
+	    is_before;
+	false ->
+	    case is_after(DT1, DT2) of
+		true ->
+		    is_after;
+		false ->
+		    same
+	    end
     end.
-
-
-compare_tuples_lex({A1, _B1, _C1}, {A2, _B2, _C2}) when A1 > A2 ->
-    later;
-compare_tuples_lex({A1, _B1, _C1}, {A2, _B2, _C2}) when A1 < A2 ->
-    earlier;
-compare_tuples_lex({_A1, B1, _C1}, {_A2, B2, _C2}) when B1 > B2 ->
-    later;
-compare_tuples_lex({_A1, B1, _C1}, {_A2, B2, _C2}) when B1 < B2 ->
-    earlier;
-compare_tuples_lex({_A1, _B1, C1}, {_A2, _B2, C2}) when C1 > C2 ->
-    later;
-compare_tuples_lex({_A1, _B1, C1}, {_A2, _B2, C2}) when C1 < C2 ->
-    earlier;
-compare_tuples_lex(_, _) ->
-    equal.
-
 
 
 -ifdef(TEST).

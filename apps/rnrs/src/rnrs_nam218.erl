@@ -11,7 +11,7 @@
 
 -module(rnrs_nam218).
 -author("Martin Vejmelka <vejmelkam@gmail.com").
--export([storage_prefix/0, url_prefix/0, manifest/3]).
+-export([domain/0, url_prefix/0, manifest/3]).
 
 
 -ifdef(TEST).
@@ -19,7 +19,7 @@
 -endif.
 
 
-storage_prefix() ->
+domain() ->
     "nam_218".
 
 
@@ -27,57 +27,72 @@ url_prefix() ->
     "http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/".
 
 
-manifest(From = {{_, _, _}, {_, 0, 0}}, To = {{_, _, _}, {_, 0, 0}}, Delta) ->
+manifest(From, To, Delta) ->
 
     % estimate the latest cycle that was run and is available online
-    UTCNow_3 = atime:shift_hours(calendar:universal_time(), -3),
+    UTCNow_3 = atime:dt_shift_hours(calendar:universal_time(), -2),
     LatestCycle = get_cycle_time(UTCNow_3, Delta),
 
-
+    % adjust from and to to be aligned on the hour (first adjustment step)
+    FromAdj = atime:dt_round_hours(From, down),
+    ToAdj = atime:dt_round_hours(To, up),
 
     % retrieve NAM 218 file names covering all times between From and To (inclusive)
     % NAM files are hourly up to 36 hrs, then available every 3 hours until 84
-    build_file_list(From, To, LatestCycle, []).
+    EmptyCoverage = {atime:dt_shift_hours(ToAdj, 1), atime:dt_shift_hours(FromAdj, -1)},
 
-
-
-build_file_list(From, To, LatestCycle, Files) ->
-    case atime:compare_dates(From, To) of
-	later ->
-	    Files;
-	_ ->
-	    {File, Next} = construct_file_name(From, LatestCycle),
-	    build_file_list(Next, To, LatestCycle, [File|Files])
+    try
+	build_file_list(FromAdj, ToAdj, LatestCycle, EmptyCoverage, no_ref, [])
+    catch
+	invalid_forecast_hour ->
+	    {error, io_lib:format("unavailable data for time range ~s to ~s with delta ~p~n",
+				  [esmf:time_to_string(From), esmf:time_to_string(To), Delta])}
     end.
 
 
-construct_file_ref(DT, LatestCycle) ->
-    {D, CT} = cull_cycle(get_cycle_time(DT, 0), LatestCycle),
-    Hrs = atime:hours_since(DT, {D, {CT, 0, 0}}),
-    {construct_file_ref(D, CT, Hrs), next_time(DT, Hrs)}.
+build_file_list(Now, To, LatestCycle, Coverage={_CFrom, CTo}, LastRef, Files) when To > CTo->
+    NextNow = atime:dt_shift_hours(Now, 1),
+    CT = cull_cycle(get_cycle_time(Now, 0), LatestCycle),
+    H = forecast_hour(atime:dt_hours_since(CT, Now)),
+    case {CT, H} == LastRef of
+	true ->
+	    build_file_list(NextNow, To, LatestCycle, Coverage, LastRef, Files);
+	false ->
+	    RefTime = atime:dt_shift_hours(CT, H),
+	    File = construct_file_ref(CT, H),
+	    build_file_list(NextNow, To, LatestCycle, update_coverage(Coverage, RefTime), {CT, H}, [File|Files])
+    end;
+
+build_file_list(_Now, _To, _LatestCycle, Coverage, _LastRef, Files) ->
+    {ok, Coverage, Files}.
 
 
-construct_file_ref(_D, _CT, Hr) when Hr > 84 ->
-    no_such_file;
-construct_file_ref({Y,M,D}, Ct, Hr) when Hr < 37 ->
-    io_lib:format("~4..0B~2..0B~2..0B/nam.t~2..0Bz.awphys~2..0B.grb2.tm00", [Y, M, D, Ct, Hr]);
-construct_file_ref({Y,M,D}, Ct, Hr) ->
-    io_lib:format("~4..0B~2..0B~2..0B/nam.t~2..0Bz.awphys~2..0B.grb2.tm00", [Y, M, D, Ct, ((Hr - 36) div 3 * 3) + 36 ]).
+update_coverage({A, B}, RefTime) when RefTime < A ->
+    update_coverage({RefTime, B}, RefTime);
+update_coverage({A, B}, RefTime) when RefTime > B->
+    update_coverage({A, RefTime}, RefTime);
+update_coverage(Cov, _RefTime) ->
+    Cov.
 
 
-next_time(DT, Hrs) when Hrs < 36 ->
-    atime:dt_shift_hours(DT, 1);
-next_time(DT, Hrs) ->
-    atime:dt_shift_hours(DT, 3).
-    
+forecast_hour(H) when (0 =< H) and (H < 37) ->
+    H;
+forecast_hour(H) when (36 < H) and (H < 85) ->
+    ((H - 36) div 3) * 3 + 36;
+forecast_hour(_H) ->
+    throw(invalid_forecast_hour).
 
+
+
+construct_file_ref({{Y,M,D}, {CHr, 0, 0}}, H) ->
+    lists:flatten(io_lib:format("nam.~4..0B~2..0B~2..0B/nam.t~2..0Bz.awphys~2..0B.grb2.tm00", [Y, M, D, CHr, H])).
 
 cull_cycle(C1, C2) ->
-    case atime:compare_dt(C1, C2) of
-	later ->
-	    C2;
-	_ ->
-	    C1
+    case atime:is_before(C1, C2) of
+	true ->
+	    C1;
+	false ->
+	    C2
     end.
 
     
@@ -94,10 +109,10 @@ get_cycle_time({Date, {H, _M, _S}}, 0) when H >= 12->
     {Date, {12, 0, 0}};
 get_cycle_time({Date, {H, _M, _S}}, 0) when H >= 6->
     {Date, {6, 0, 0}};
-get_cycle_time({Date, {H, _M, _S}}, 0) ->
+get_cycle_time({Date, _Time}, 0) ->
     {Date, {0, 0, 0}};
 get_cycle_time(DateTime, Delta) ->
-    atime:dt_shift_hours(get_cycle_time(DateTime, Delta-1), -6).
+    atime:dt_shift_hours(get_cycle_time(DateTime, Delta - 1), -6).
 
 
 
@@ -105,7 +120,8 @@ get_cycle_time(DateTime, Delta) ->
 
 -ifdef(TEST).
 
-construct_name_test() ->
-    ?assert(construct_file_ref(a, b, 85) =:= no_such_file),
-    ?assert(construct_file_ref({2012, 5, 4}, 18, 10) =:= "20120504/nam.t18z.awphys10.grb2.tm00"),
-    ?assert(construct_file_ref({2012, 5, 4}, 18, 41) =:= "20120504/nam.t18z.awphys39.grb2.tm00").
+cycle_time_test() ->
+    ?assert(get_cycle_time({{2013, 5, 1}, {1, 30, 15}}, 0) =:= {{2013, 5, 1}, {0, 0, 0}}),
+    ?assert(get_cycle_time({{2013, 5, 1}, {1, 30, 15}}, 1) =:= {{2013, 4, 30}, {18, 0, 0}}).
+    
+-endif.
