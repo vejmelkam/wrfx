@@ -37,6 +37,6 @@ make_exec_plan(Args) ->
 	  [ { filesys_tasks, create_symlink, [filename:join(WRFDir, F), filename:join(ExecDir, F)] } || F <- Files ],
 	  [ { filesys_tasks, create_symlink, [filename:join(WPSExecDir, F), filename:join(ExecDir, F)] } || F <- MET_Files ],
 	  {filesys_tasks, write_file, [filename:join(ExecDir, "namelist.input"), nllist:to_text(WRFNL)]},
-	  {exec_tasks, run_scan_output, [ExecDir, "./real.exe", "Successful"]} ],
+	  {exec_tasks, run_maybe_mpi, [ExecDir, "./real.exe", "SUCCESS COMPLETE"]} ],
 	  
     #plan{id=wrf_prep_exec, tasks=lists:flatten(T)}.

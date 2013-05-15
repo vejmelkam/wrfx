@@ -16,6 +16,9 @@
 %
 
 test_job() ->
+
+    inets:start(),
+    stor:start(),
     
     WRFDir = "/home/martin/Projects/wrf-fire",
     WPSTempl = nllist:parse(filename:join(WRFDir, "WPS/namelist.wps")),
@@ -61,14 +64,14 @@ run_job(Cfg) ->
 
     case plan_runner:execute_plan(Plan) of
      	{success, _Log} ->
-     	    prep_wrf(Cfg);
+     	    prep_wrf(Cfg3);
 	{failure, _MFA, Text, _R, _Log} ->
 	    io:format("error during plan execution [~p]~n", [lists:flatten(Text)]),
 	    {failure, Text}
     end.
 
 
-prep_wrf() ->
+prep_wrf(Cfg) ->
 
     % Make an execution plan and run it (this does everything except submitting the wrf_job
     Plan = wrf_prep:make_exec_plan(Cfg),
@@ -81,10 +84,10 @@ prep_wrf() ->
 	{failure, _MFA, Text, _R, _Log} ->
 	    io:format("error during plan execution [~p]~n", [lists:flatten(Text)]),
 	    {failure, Text}
-    end,
+    end.
 
 
-run_wrf() ->
+run_wrf(_Cfg) ->
     io:format("not implemeted yet.").
 
     % FIXME: enqueue WRF job

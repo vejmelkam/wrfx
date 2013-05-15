@@ -2,10 +2,10 @@
 
 -module(filesys).
 -author("Martin Vejmelka <vejmelkam@gmail.com").
--export([list_files_regexp/2]).
+-export([list_dir_regexp/2]).
 
 
-list_files_regexp(Dir, RegExp) ->
+list_dir_regexp(Dir, RegExp) ->
     {ok, MP} = re:compile(RegExp),
     {ok, FN} = file:list_dir(Dir),
     lists:filter(fun (X) -> is_match_re(X, MP) end, FN).
