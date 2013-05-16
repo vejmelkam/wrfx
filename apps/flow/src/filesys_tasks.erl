@@ -1,8 +1,18 @@
 
 -module(filesys_tasks).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([dir_exists/1, create_dir/1, create_symlink/2,
+-export([dir_exists/1, file_exists/1,
+	 create_dir/1, create_symlink/2,
 	 write_file/2, delete_file/1]).
+
+
+file_exists(F) ->
+    case filelib:is_file(F) of
+	true ->
+	    {success, io_lib:format("file ~p exists.", [F])};
+	false ->
+	    {failure, io_lib:format("file ~p does not exist.", [F])}
+    end.
 
 
 dir_exists(D) ->
