@@ -4,7 +4,7 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 
 -include_lib("flow/include/flow.hrl").
--export([run_job/1, test_job/0, detect_wrf_real/1, detect_wrf_build_type/1]).
+-export([run_job/1, test_job/0, detect_wrf_real/1, detect_wrf_build/1]).
 
 %
 %  Required inputs in the Cfg object
@@ -30,7 +30,7 @@ test_job() ->
 					     vanilla_wrf_v34),
 
     Cfg = plist:update_with([ {wrf_root_dir, WRFDir},
-			      {wrf_build_type, wrf_det:detect_build_type(WRFDir)},
+			      {wrf_build_type, detect_wrf_build(WRFDir)},
 			      {wps_exec_dir, "/home/martin/Temp/wps_temp_anjk4378"},
 			      {wrf_exec_dir, "/home/martin/Temp/wrf_temp_anjk4378"},
 			      {wps_nl_template, WPSTempl},
@@ -145,11 +145,10 @@ detect_wrf_real(WRFRoot) ->
     end.
 
 
-detect_wrf_build_type(WRFRoot) ->
+detect_wrf_build(WRFRoot) ->
     WRFRunDir = filename:join(WRFRoot, "WRFV3/run"),
     Cmd = io_lib:format("nm ~p/wrf.exe", [WRFRunDir]),
     Output = os:cmd(Cmd),
-    io:format(Output),
     case string:str(Output, "wrf") of
 	0 ->
 	    failed;

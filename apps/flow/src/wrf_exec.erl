@@ -15,7 +15,7 @@ run(Args) ->
     spawn(fun() -> S ! run(ExecMethod, Args) end).
     
 
-run(local_execute, Args) ->
+run(serial_run, Args) ->
     Dir = plist:getp(wrf_exec_dir, Args);
 
 
