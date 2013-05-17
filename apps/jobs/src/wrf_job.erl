@@ -3,7 +3,8 @@
 -module(wrf_job).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 
--export([run_job/1, test_job/0]).
+-include_lib("flow/include/flow.hrl").
+-export([run_job/1, test_job/0, detect_wrf_real/1, detect_wrf_build_type/1]).
 
 %
 %  Required inputs in the Cfg object
@@ -129,3 +130,34 @@ retrieve_grib_files(Dom, URLBase, [ID|IDs], List) ->
     end.
 
     
+
+detect_wrf_real(WRFRoot) ->
+
+    FileList = [ "WRFV3/run/wrf.exe", "WRFV3/run/real.exe" ],
+    P = #plan{id = check_wrf_installation,
+	      tasks = [ {filesys_tasks, file_exists, [ filename:join(WRFRoot, F) ] } || F <- FileList ]},
+    PID = plan_runner:execute_plan(P),
+    case plan_runner:wait_for_plan(PID) of
+	{success,_} ->
+	    have_wrf_real;
+	_ ->
+	    no_wrf_real
+    end.
+
+
+detect_wrf_build_type(WRFRoot) ->
+    WRFRunDir = filename:join(WRFRoot, "WRFV3/run"),
+    Cmd = io_lib:format("nm ~p/wrf.exe", [WRFRunDir]),
+    Output = os:cmd(Cmd),
+    io:format(Output),
+    case string:str(Output, "wrf") of
+	0 ->
+	    failed;
+	_ ->
+	    case string:str(Output, "mpi_finalize") of
+		0 ->
+		    no_mpi;
+		_ ->
+		    with_mpi
+	    end
+    end.
