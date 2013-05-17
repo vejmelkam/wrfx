@@ -33,13 +33,16 @@ test_job() ->
 			      {wrf_build_type, detect_wrf_build(WRFDir)},
 			      {wps_exec_dir, "/home/martin/Temp/wps_temp_anjk4378"},
 			      {wrf_exec_dir, "/home/martin/Temp/wrf_temp_anjk4378"},
+			      {wrf_exec_method, serial_local},
 			      {wps_nl_template, WPSTempl},
 			      {wrf_nl_template, WRFTempl},
 			      {nl_spec, NLSpec},
 			      {wrf_from, {{2013, 5, 1}, {0, 0, 0}}},
-			      {wrf_to, {{2013, 5, 1}, {3, 0, 0}}},
+			      {wrf_to, {{2013, 5, 1}, {0, 30, 0}}},
+			      {grib_interval_seconds, 1800},
 			      {vtable_file, "ungrib/Variable_Tables/Vtable.NAM"},
 			      {grib_sources, [rnrs_nam218]} ],
+			    
 			      Cfg1),
 
     % delete the test dir
@@ -63,7 +66,7 @@ run_job(Cfg) ->
 
     % plan & execute WPS job
     Plan = wps_exec:make_exec_plan(Cfg3),
-    io:format("~p~n", [Plan]),
+    io:format("wps_exec plan has ~p steps.~n", [plan:count_steps(Plan)]),
 
     PID = plan_runner:execute_plan(Plan),
     case plan_runner:wait_for_plan(PID) of
@@ -85,21 +88,53 @@ prep_wrf(Cfg) ->
     case plan_runner:wait_for_plan(PID) of
 	{success, _Log} ->
 	    io:format("success.~n"),
-	    run_wrf(Cfg);
+	    run_wrf(plist:getp(wrf_exec_method, Cfg), Cfg);
 	{failure, _MFA, Text, _R, _Log} ->
 	    io:format("error during plan execution [~p]~n", [lists:flatten(Text)]),
 	    {failure, Text}
     end.
 
 
-run_wrf(_Cfg) ->
-    io:format("not implemeted yet.").
+run_wrf(serial_local, Cfg) ->
+    Dir = plist:getp(wrf_exec_dir, Cfg),
+    PID = exmon:run(filename:join(Dir, "wrf.exe"), [], [self()]),
+    {ok, D} = file:open(filename:join(Dir, "wrf_output.log"), [write]),
+    case wait_for_wrf_completion(PID, D) of
+	success ->
+	    post_wrf(Cfg);
+	{failure, Text} ->
+	    io:format("error during execution of wrf.exe [~p]~n", [lists:flatten(Text)]),
+	    {failure, Text}
+    end.
 
-    % FIXME: enqueue WRF job
 
-    % FIXME: monitor WRF job
+wait_for_wrf_completion(PID, D) ->
+    receive
 
-    % FIXME: retrieve and store outputs
+	% messages from the exmon wrf monitor
+	{line, L} ->
+	    % a wrf message processor should be here to scan output, predict completion
+	    % detect error conditions, etc.
+	    file:write(D, L),
+	    file:write(D, "\n"),
+	    wait_for_wrf_completion(PID, D);
+	{exit_detected, 0} ->
+	    file:close(D),
+	    success;
+	{exit_detected, Code} ->
+	    file:close(D),
+	    {failure, io:format("wrf.exe exited with code ~p~n", [Code])};
+	
+	% messages from command interface
+	kill_job ->
+	    exmon:kill(PID),
+	    wait_for_wrf_completion(PID, D)
+    end.
+
+
+post_wrf(_Cfg) ->
+    io:format("Not implemented yet."),
+    success.
 
 
 make_namelists(Cfg) ->
