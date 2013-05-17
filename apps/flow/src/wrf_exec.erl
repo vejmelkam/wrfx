@@ -8,12 +8,24 @@
 
 
 run(Args) ->
-    Method = plist:getp(wrf_exec_method, Args),
+    BuildType = plist:getp(wrf_build_type, Args),
+    ExecMethod = plist:getp(wrf_exec_method, Args),
+
     S = self(),
-    spawn(fun() -> S ! run(Method, Args) end).
+    spawn(fun() -> S ! run(ExecMethod, Args) end).
     
 
-run(serial, Args) ->
-    Dir = plist:getp(wrf_exec_dir, Args),
+run(local_execute, Args) ->
+    Dir = plist:getp(wrf_exec_dir, Args);
+
+
+run(mpi_exec, Args) ->
+    Dir = plist:getp(wrf_exec_dir, Args);
+
+
+run(submit_job, Args) ->
+    Dir = plist:getp(wrf_exec_dir, Args).
+    
+    
     
     

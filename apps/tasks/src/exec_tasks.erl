@@ -28,13 +28,13 @@ run_maybe_mpi(InDir, Cmd, ScanString) ->
     Output = os:cmd(io_lib:format("cd ~p && ~p", [InDir, Cmd])),
     case string:str(Output, "starting wrf task") of
 	0 ->
+	    D = Output;
+	_ ->
 	    % the file was compiled with MPI, output is in rsl.error.000
 	    {ok, B} = file:read_file(filename:join(InDir, "rsl.error.0000")),
 
 	    % this is inefficient but this segment is not performance sensitive
-	    D = binary_to_list(B);
-	_ ->
-	    D = Output
+	    D = binary_to_list(B)
     end,
     case string:str(D, ScanString) of
 	0 ->

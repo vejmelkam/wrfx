@@ -29,6 +29,7 @@ test_job() ->
 					     vanilla_wrf_v34),
 
     Cfg = plist:update_with([ {wrf_root_dir, WRFDir},
+			      {wrf_build_type, wrf_det:detect_build_type(WRFDir)},
 			      {wps_exec_dir, "/home/martin/Temp/wps_temp_anjk4378"},
 			      {wrf_exec_dir, "/home/martin/Temp/wrf_temp_anjk4378"},
 			      {wps_nl_template, WPSTempl},
@@ -42,6 +43,7 @@ test_job() ->
 
     % delete the test dir
     os:cmd(["rm -rf ", plist:getp(wps_exec_dir, Cfg)]),
+    os:cmd(["rm -rf ", plist:getp(wrf_exec_dir, Cfg)]),
 
     run_job(Cfg).
 
@@ -62,7 +64,8 @@ run_job(Cfg) ->
     Plan = wps_exec:make_exec_plan(Cfg3),
     io:format("~p~n", [Plan]),
 
-    case plan_runner:execute_plan(Plan) of
+    PID = plan_runner:execute_plan(Plan),
+    case plan_runner:wait_for_plan(PID) of
      	{success, _Log} ->
      	    prep_wrf(Cfg3);
 	{failure, _MFA, Text, _R, _Log} ->
@@ -77,7 +80,8 @@ prep_wrf(Cfg) ->
     Plan = wrf_prep:make_exec_plan(Cfg),
     io:format("~p~n", [Plan]),
     
-    case plan_runner:execute_plan(Plan) of
+    PID = plan_runner:execute_plan(Plan),
+    case plan_runner:wait_for_plan(PID) of
 	{success, _Log} ->
 	    io:format("success.~n"),
 	    run_wrf(Cfg);
