@@ -1,0 +1,11 @@
+{application, tasks,
+ [
+  {description, "Tasks library for the [work]flow manager."},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []}
+ ]}.
