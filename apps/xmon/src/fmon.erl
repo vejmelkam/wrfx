@@ -24,7 +24,7 @@ start(F, Monitors) ->
 
 
 stop(PID) ->
-    PID ! stop.
+    PID ! {stop, self()}.
 
 
 start_monitor(F, Monitors) ->
@@ -60,8 +60,8 @@ try_read_line(stop, D, _M) ->
 
 check_for_messages(M) ->
     receive
-	stop ->
-	    router:multicast({stopped, self()}, M),
+	{stop, From} ->
+	    router:multicast({eof, From}, M),
 	    stop;
 	Msg ->
 	    io:format("fmon: unexpected message [~p]~n", [Msg]),
@@ -78,13 +78,13 @@ check_for_messages(M) ->
 simple_test() ->
     PID = start("/etc/passwd", [self()]),
     stop(PID),
-    read_all_in(PID).
+    read_all_in(self()).
 
-read_all_in(PID) ->
+read_all_in(MasterPID) ->
     receive
 	{line, _L} ->
-	    read_all_in(PID);
-	{stopped, PID} ->
+	    read_all_in(MasterPID);
+	{eof, MasterPID} ->
 	    ok
     end.
     

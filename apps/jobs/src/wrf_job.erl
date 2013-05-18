@@ -42,7 +42,6 @@ test_job() ->
 			      {grib_interval_seconds, 1800},
 			      {vtable_file, "ungrib/Variable_Tables/Vtable.NAM"},
 			      {grib_sources, [rnrs_nam218]} ],
-			    
 			      Cfg1),
 
     % delete the test dir
@@ -82,7 +81,7 @@ prep_wrf(Cfg) ->
 
     % Make an execution plan and run it (this does everything except submitting the wrf_job
     Plan = wrf_prep:make_exec_plan(Cfg),
-    io:format("~p~n", [Plan]),
+    io:format("wrf_prep plan has ~p steps.~n", [plan:count_steps(Plan)]),
     
     PID = plan_runner:execute_plan(Plan),
     case plan_runner:wait_for_plan(PID) of
@@ -97,38 +96,65 @@ prep_wrf(Cfg) ->
 
 run_wrf(serial_local, Cfg) ->
     Dir = plist:getp(wrf_exec_dir, Cfg),
-    PID = exmon:run(filename:join(Dir, "wrf.exe"), [], [self()]),
+    FS = file_sink:start(filename:join(Dir, "wrf_output.log")),
+    PID = exmon:run(filename:join(Dir, "wrf.exe"), [{cd, Dir}], [self(), FS]),
     {ok, D} = file:open(filename:join(Dir, "wrf_output.log"), [write]),
     case wait_for_wrf_completion(PID, D) of
 	success ->
 	    post_wrf(Cfg);
 	{failure, Text} ->
-	    io:format("error during execution of wrf.exe [~p]~n", [lists:flatten(Text)]),
+	    io:format("error during execution of wrf.exe [~p]~n", [Text]),
 	    {failure, Text}
+    end;
+
+
+run_wrf(mpi_local, Cfg) ->
+
+    % retrieve runtime parameters from configuration
+    Dir = plist:getp(wrf_exec_dir, Cfg),
+    Machines = plist:getp(mpi_nodes, Cfg),
+    N = integer_to_list(plist:getp(mpi_nprocs, Cfg)),
+    MPI = plist:getp(mpi_exec_name, Cfg),
+
+    % write a machinefile into the wrf directory
+    file:write_file(filename:join(Dir, "node_list"), string:join(Machines, "\n")),
+
+    % execute the mpiexec/mpirun command as per configuration
+    PID = exmon:run(MPI, [{cd, Dir}, {args, ["-machinefile", "node_list", "-n", N, "./wrf.exe"]}]),
+
+    % start monitoring the main output file
+    PIDF = fmon:start(filename:join(Dir, "rsl.error.0000"), [self()]),
+
+    % both the file and the mpirun stdout will be routed to wait_for_wrf_completion
+    case wait_for_wrf_completion(PID) of
+	success ->
+	    fmon:stop(PIDF),
+	    post_wrf(Cfg);
+	{failure, Text} ->
+	    Text2 = io_lib:format("error during mpi execution of wrf.exe [~p]~n", [Text]),
+	    {failure, Text2}
     end.
 
 
-wait_for_wrf_completion(PID, D) ->
-    receive
 
+wait_for_wrf_completion(PID) ->
+    receive
 	% messages from the exmon wrf monitor
 	{line, L} ->
 	    % a wrf message processor should be here to scan output, predict completion
 	    % detect error conditions, etc.
-	    file:write(D, L),
-	    file:write(D, "\n"),
-	    wait_for_wrf_completion(PID, D);
+	    wait_for_wrf_completion(PID);
 	{exit_detected, 0} ->
 	    file:close(D),
 	    success;
 	{exit_detected, Code} ->
 	    file:close(D),
-	    {failure, io:format("wrf.exe exited with code ~p~n", [Code])};
+	    {failure, io:format("process exited with code ~p~n", [Code])};
 	
 	% messages from command interface
 	kill_job ->
 	    exmon:kill(PID),
-	    wait_for_wrf_completion(PID, D)
+	    wait_for_wrf_completion(PID)
     end.
 
 

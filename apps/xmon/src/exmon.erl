@@ -8,7 +8,7 @@
 
 -module(exmon).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([run/2, run/3, kill/1]).
+-export([run/3, kill/1]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -19,15 +19,12 @@ kill(PID) ->
     PID ! send_kill.
 
 
-run(ExFile, Args, Monitors) ->
-    spawn(fun() -> run_and_monitor(ExFile, Args, Monitors) end).
-
-run(ExFile, Monitors) ->
-    spawn(fun() -> run_and_monitor(ExFile, [], Monitors) end).
+run(ExFile, Opts, Monitors) ->
+    spawn(fun() -> run_and_monitor(ExFile, Opts, Monitors) end).
 
 
-run_and_monitor(ExFile, Args, Monitors) ->
-    P = open_port({spawn_executable, ExFile}, [{args, Args}, {line, 5000}, exit_status, use_stdio]),
+run_and_monitor(ExFile, Opts, Monitors) ->
+    P = open_port({spawn_executable, ExFile}, [{line, 5000}, exit_status, use_stdio | Opts]),
     monitor_process(P, Monitors).
     
 
