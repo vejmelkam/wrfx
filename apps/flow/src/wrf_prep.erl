@@ -18,9 +18,10 @@
 make_exec_plan(Args) ->
 
     WPSExecDir = plist:getp(wps_exec_dir, Args),
-    WRFDir = filename:join(plist:getp(wrf_root_dir, Args), "WRFV3/run"),  % directory, which is setup to run WRF
+    WRFDir = filename:join(plist:getp(wrf_install_dir, Args), "run"),     % directory, which is setup to run WRF
     ExecDir = plist:getp(wrf_exec_dir, Args),                             % directory in which WPS step is supposed to run
     WRFNL = plist:getp(wrf_nl, Args),                                     % namelist for wps
+    BuildType = plist:getp(wrf_build_type, Args),                         % MPI compiled or not?
 
     % files that must be symlinked from the workspace directory
     Files = [ "CAM_ABS_DATA", "CAM_AEROPT_DATA", "co2_trans", "ETAMPNEW_DATA", "ETAMPNEW_DATA_DBL",
@@ -37,6 +38,14 @@ make_exec_plan(Args) ->
 	  [ { filesys_tasks, create_symlink, [filename:join(WRFDir, F), filename:join(ExecDir, F)] } || F <- Files ],
 	  [ { filesys_tasks, create_symlink, [filename:join(WPSExecDir, F), filename:join(ExecDir, F)] } || F <- MET_Files ],
 	  {filesys_tasks, write_file, [filename:join(ExecDir, "namelist.input"), nllist:to_text(WRFNL)]},
-	  {exec_tasks, run_maybe_mpi, [ExecDir, "./real.exe", "SUCCESS COMPLETE"]} ],
+	  {exec_tasks, execute, [filename:join(ExecDir, "real.exe"), 
+				 [{in_dir, ExecDir}, {output_type, real_exe_output(BuildType)},
+				  {exit_check, {scan_for, "SUCCESS COMPLETE REAL_EM"}},
+				  {output_to, filename:join(ExecDir, "real.output")}]]} ],
 	  
     #plan{id=wrf_prep_exec, tasks=lists:flatten(T)}.
+
+real_exe_output(no_mpi) ->
+    stdout;
+real_exe_output(with_mpi) ->
+    "rsl.error.0000".

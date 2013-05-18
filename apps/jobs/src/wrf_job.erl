@@ -21,32 +21,30 @@ test_job() ->
     inets:start(),
     stor:start(),
     
-    WRFDir = "/home/martin/Projects/wrf-fire",
-    WPSTempl = nllist:parse(filename:join(WRFDir, "WPS/namelist.wps")),
-    WRFTempl = nllist:parse(filename:join(WRFDir, "WRFV3/run/namelist.input")),
+    WRFDir = "/home/martin/Projects/wrf-fire-serial/WRFV3",
+    WPSDir = "/home/martin/Projects/wrf-fire-serial/WPS",
+    WPSTempl = nllist:parse(filename:join(WPSDir, "namelist.wps")),
+    WRFTempl = nllist:parse(filename:join(WRFDir, "run/namelist.input")),
     Cfg1 = wrf_nl:read_config(WRFTempl),
 
-    NLSpec = wrf_reg:create_profile_from_reg(filename:join(WRFDir, "WRFV3/Registry"),
+    NLSpec = wrf_reg:create_profile_from_reg(filename:join(WRFDir, "Registry"),
 					     vanilla_wrf_v34),
 
-    Cfg = plist:update_with([ {wrf_root_dir, WRFDir},
+    Cfg = plist:update_with([ {wrf_install_dir, WRFDir},
+			      {wps_install_dir, WPSDir},
 			      {wrf_build_type, detect_wrf_build(WRFDir)},
-			      {wps_exec_dir, "/home/martin/Temp/wps_temp_anjk4378"},
-			      {wrf_exec_dir, "/home/martin/Temp/wrf_temp_anjk4378"},
-			      {wrf_exec_method, serial_local},
+			      {wrf_exec_method, immediate},
+			      {job_name, "anjk4378"},
+			      {workspace_dir, "/home/martin/Temp"},
 			      {wps_nl_template, WPSTempl},
 			      {wrf_nl_template, WRFTempl},
 			      {nl_spec, NLSpec},
 			      {wrf_from, {{2013, 5, 1}, {0, 0, 0}}},
 			      {wrf_to, {{2013, 5, 1}, {0, 30, 0}}},
+			      {history_interval_min, 15},
 			      {grib_interval_seconds, 1800},
-			      {vtable_file, "ungrib/Variable_Tables/Vtable.NAM"},
 			      {grib_sources, [rnrs_nam218]} ],
 			      Cfg1),
-
-    % delete the test dir
-    os:cmd(["rm -rf ", plist:getp(wps_exec_dir, Cfg)]),
-    os:cmd(["rm -rf ", plist:getp(wrf_exec_dir, Cfg)]),
 
     run_job(Cfg).
 
@@ -55,10 +53,24 @@ run_job(Cfg) ->
 
     % FIXME: this is very basic, retrieve_grib_files needs to go into the retr module
     R = lists:nth(1, plist:getp(grib_sources, Cfg)),
-    {{WPSFrom, WPSTo}, GribFiles} = retrieve_grib_files(R, plist:getp(wrf_from, Cfg), plist:getp(wrf_to, Cfg)),
+    {{WPSFrom, WPSTo}, VtableFile, GribFiles} = retrieve_grib_files(R, plist:getp(wrf_from, Cfg), plist:getp(wrf_to, Cfg)),
+
+    % construct temporary workspaces from job name
+    JN = plist:getp(job_name, Cfg),
+    WPSExecDir = filename:join(plist:getp(workspace_dir, Cfg), "wps_" ++ JN),
+    WRFExecDir = filename:join(plist:getp(workspace_dir, Cfg), "wrf_" ++ JN),
+
+    % ensure these workspaces are empty
+    filesys:remove_directory(WPSExecDir),
+    filesys:remove_directory(WRFExecDir),
 
     % given the limits in the GRIB files, update the configuration
-    Cfg2 = plist:update_with([{grib_files, GribFiles}, {wps_from, WPSFrom}, {wps_to, WPSTo}], Cfg),
+    Cfg2 = plist:update_with([{grib_files, GribFiles},
+			      {wps_from, WPSFrom},
+			      {wps_to, WPSTo},
+			      {vtable_file, VtableFile},
+			      {wps_exec_dir, WPSExecDir},
+			      {wrf_exec_dir, WRFExecDir}], Cfg),
 
     % construct WRF and WPS namelists
     Cfg3 = make_namelists(Cfg2),
@@ -82,81 +94,83 @@ prep_wrf(Cfg) ->
     % Make an execution plan and run it (this does everything except submitting the wrf_job
     Plan = wrf_prep:make_exec_plan(Cfg),
     io:format("wrf_prep plan has ~p steps.~n", [plan:count_steps(Plan)]),
+
+    % Find execution method to use
+    ExecM = plist:getp(wrf_exec_method, Cfg),
+    BuildT = plist:getp(wrf_build_type, Cfg),
     
     PID = plan_runner:execute_plan(Plan),
     case plan_runner:wait_for_plan(PID) of
 	{success, _Log} ->
-	    io:format("success.~n"),
-	    run_wrf(plist:getp(wrf_exec_method, Cfg), Cfg);
+	    run_wrf(ExecM, BuildT, Cfg);
 	{failure, _MFA, Text, _R, _Log} ->
 	    io:format("error during plan execution [~p]~n", [lists:flatten(Text)]),
 	    {failure, Text}
     end.
 
 
-run_wrf(serial_local, Cfg) ->
+run_wrf(immediate, no_mpi, Cfg) ->
     Dir = plist:getp(wrf_exec_dir, Cfg),
-    FS = file_sink:start(filename:join(Dir, "wrf_output.log")),
-    PID = exmon:run(filename:join(Dir, "wrf.exe"), [{cd, Dir}], [self(), FS]),
-    case wait_for_wrf_completion(PID) of
-	success ->
+    R = exec_tasks:execute(filename:join(Dir, "wrf.exe"),
+			   [ {in_dir, Dir}, {output_type, stdout},
+			     {exit_check, {scan_for, "SUCCESS"}},
+			     {store_to, filename:join(Dir, "wrf.output")} ]),
+    case R of
+	{success, _Msg} ->
 	    post_wrf(Cfg);
-	{failure, Text} ->
-	    io:format("error during execution of wrf.exe [~p]~n", [Text]),
-	    {failure, Text}
+	_ ->
+	    R
     end;
 
-
-run_wrf(mpi_local, Cfg) ->
+run_wrf(immediate, with_mpi, Cfg) ->
 
     % retrieve runtime parameters from configuration
     Dir = plist:getp(wrf_exec_dir, Cfg),
     Machines = plist:getp(mpi_nodes, Cfg),
-    N = integer_to_list(plist:getp(mpi_nprocs, Cfg)),
+    NP = integer_to_list(plist:getp(mpi_nprocs, Cfg)),
     MPI = plist:getp(mpi_exec_name, Cfg),
 
     % write a machinefile into the wrf directory
     file:write_file(filename:join(Dir, "node_list"), string:join(Machines, "\n")),
 
     % execute the mpiexec/mpirun command as per configuration
-    PID = exmon:run(MPI, [{cd, Dir}, {args, ["-machinefile", "node_list", "-n", N, "./wrf.exe"]}]),
-
-    % start monitoring the main output file
-    PIDF = fmon:start(filename:join(Dir, "rsl.error.0000"), [self()]),
-
-    % both the file and the mpirun stdout will be routed to wait_for_wrf_completion
-    case wait_for_wrf_completion(PID) of
-	success ->
-	    fmon:stop(PIDF),
+    R = exec_tasks:execute(MPI,
+			   [{in_dir, Dir}, {output_type, "rsl.error.0000"},
+			    {exit_check, {scan_for, "SUCCESS"}},
+			    {args, ["-machinefile", "node_list", "-np", NP]},
+			    {store_to, filename:join(Dir, "wrf.output")}]),
+    case R of
+	{success, _Msg} ->
 	    post_wrf(Cfg);
-	{failure, Text} ->
-	    Text2 = io_lib:format("error during mpi execution of wrf.exe [~p]~n", [Text]),
-	    {failure, Text2}
+	_ ->
+	    R
     end.
 
 
 
-wait_for_wrf_completion(PID) ->
-    receive
-	% messages from the exmon wrf monitor
-	{line, _L} ->
-	    % a wrf message processor should be here to scan output, predict completion
-	    % detect error conditions, etc.
-	    wait_for_wrf_completion(PID);
-	{exit_detected, 0} ->
-	    success;
-	{exit_detected, Code} ->
-	    {failure, io:format("process exited with code ~p~n", [Code])};
-	
-	% messages from command interface
-	kill_job ->
-	    exmon:kill(PID),
-	    wait_for_wrf_completion(PID)
-    end.
+post_wrf(Cfg) ->
+    JN = plist:getp(job_name, Cfg),
+    WPSDir = plist:getp(wps_exec_dir, Cfg),
+    WRFDir = plist:getp(wrf_exec_dir, Cfg),
+    WPSL = [ "geogrid.output", "ungrib.output", "metgrid.output",
+	     "geogrid.log", "ungrib.log", "metgrid.log",
+	     "namelist.wps" ],
+    WRFL = [ "namelist.input", "real.output", "wrf.output" ],
 
+    Dom = "outputs/" ++ JN,
+    stor:ensure_location(Dom, "test_file"),
 
-post_wrf(_Cfg) ->
-    io:format("Not implemented yet."),
+    % store all fixed files
+    lists:map(fun (X) -> stor:store(Dom, X, filename:join(WPSDir, X)) end, WPSL),
+    lists:map(fun (X) -> stor:store(Dom, X, filename:join(WRFDir, X)) end, WRFL),
+
+    % store wrfout files
+    WRFOuts = filesys:list_dir_regexp(WRFDir, "wrfout.+"),
+    lists:map(fun (X) -> stor:store(Dom, X, filename:join(WRFDir, X)) end, WRFOuts),
+
+    % clean out and remove directories
+    filesys:remove_directory(plist:getp(wps_exec_dir, Cfg)),
+    filesys:remove_directory(plist:getp(wrf_exec_dir, Cfg)),
     success.
 
 
@@ -170,7 +184,7 @@ retrieve_grib_files(R, From, To) ->
     Dom = apply(R, domain, []),
     URLBase = apply(R, url_prefix, []),
     {ok, Cov, IDs} = apply(R, manifest, [From, To, 0]),
-    {Cov, retrieve_grib_files(Dom, URLBase, IDs, [])}.
+    {Cov, apply(R, vtable, []), retrieve_grib_files(Dom, URLBase, IDs, [])}.
 
 
 retrieve_grib_files(_Dom, _URL, [], List) ->
@@ -191,7 +205,7 @@ retrieve_grib_files(Dom, URLBase, [ID|IDs], List) ->
 
 detect_wrf_real(WRFRoot) ->
 
-    FileList = [ "WRFV3/run/wrf.exe", "WRFV3/run/real.exe" ],
+    FileList = [ "run/wrf.exe", "run/real.exe" ],
     P = #plan{id = check_wrf_installation,
 	      tasks = [ {filesys_tasks, file_exists, [ filename:join(WRFRoot, F) ] } || F <- FileList ]},
     PID = plan_runner:execute_plan(P),
@@ -204,7 +218,7 @@ detect_wrf_real(WRFRoot) ->
 
 
 detect_wrf_build(WRFRoot) ->
-    WRFRunDir = filename:join(WRFRoot, "WRFV3/run"),
+    WRFRunDir = filename:join(WRFRoot, "run"),
     Cmd = io_lib:format("nm ~p/wrf.exe", [WRFRunDir]),
     Output = os:cmd(Cmd),
     case string:str(Output, "wrf") of

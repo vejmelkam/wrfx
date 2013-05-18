@@ -9,7 +9,7 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 
 -export([new/0, keys/1, props/1, 
-	 setp/3, getp/2, get_list/2, contains/2,
+	 setp/3, getp/2, getp/3, get_list/2, contains/2,
 	 update_with/2, update_with/3,
 	 store/2]).
 
@@ -42,6 +42,15 @@ getp(K, [{K,V}|_P]) ->
     V;
 getp(K, [_E|P]) ->
     getp(K, P).
+
+
+getp(K, P, Def) ->
+    case getp(K, P) of
+	not_found ->
+	    Def;
+	V ->
+	    V
+    end.
 
 
 get_list(K, P) ->

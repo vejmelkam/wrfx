@@ -4,10 +4,9 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -behavior(gen_server).
 
--export([ensure_location/2, resolve/2, check_exists/2, remove/2, stop_storage/0,            % API
-	 init/1, handle_call/3, handle_cast/2,  handle_info/2, terminate/2, code_change/3,  % gen_server
-	 start_link/0, start/0
-	]).
+-export([ensure_location/2, resolve/2, check_exists/2, remove/2, store/3,  % API
+	 init/1, handle_call/3, handle_cast/2,  handle_info/2, terminate/2, code_change/3,
+	 start_link/0, start/0, stop_storage/0]).
 
 start() ->
     application:start(stor).
@@ -21,6 +20,15 @@ init(_Args) ->
     ok = filelib:ensure_dir(filename:join(Root, "touch")),
     {ok, Root}.
 
+
+handle_call({store, Domain, ID, File}, _From, Root) ->
+    Dest = filename:join([Root, Domain, ID]),
+    case file:rename(File, Dest) of
+	ok ->
+	    {reply, success, Root};
+	{error, R} ->
+	    {reply, {failure, R}, Root}
+    end;
 
 handle_call({ensure_location, Domain, ID}, _From, Root) ->
     F = filename:join([Root, Domain, ID]),
@@ -75,6 +83,9 @@ handle_cast(_Req, State) ->
     {noreply, State}.
 
 
+
+store(Dom, ID, File) ->
+    gen_server:call(stor, {store, Dom, ID, File}).
 
 ensure_location(Dom, ID) ->
     gen_server:call(stor, {ensure_location, Dom, ID}).

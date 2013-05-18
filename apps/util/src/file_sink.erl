@@ -22,10 +22,10 @@ stop(PID) ->
 
 file_sink_loop(D) ->
     receive
-	{line, L} ->
+	{_PID, line, L} ->
 	    file:write(D, L),
 	    file:write(D, "\n"),
 	    file_sink_loop(D);
-	{eof, _From} ->
+	{_PID, eof, _From} ->
 	    file:close(D)
     end.

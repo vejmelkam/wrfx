@@ -11,12 +11,16 @@
 
 -module(rnrs_nam218).
 -author("Martin Vejmelka <vejmelkam@gmail.com").
--export([domain/0, url_prefix/0, manifest/3]).
+-export([domain/0, url_prefix/0, manifest/3, vtable/0]).
 
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
+
+
+vtable() ->
+    "ungrib/Variable_Tables/Vtable.NAM".
 
 
 domain() ->
