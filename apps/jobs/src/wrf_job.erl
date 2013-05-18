@@ -98,8 +98,7 @@ run_wrf(serial_local, Cfg) ->
     Dir = plist:getp(wrf_exec_dir, Cfg),
     FS = file_sink:start(filename:join(Dir, "wrf_output.log")),
     PID = exmon:run(filename:join(Dir, "wrf.exe"), [{cd, Dir}], [self(), FS]),
-    {ok, D} = file:open(filename:join(Dir, "wrf_output.log"), [write]),
-    case wait_for_wrf_completion(PID, D) of
+    case wait_for_wrf_completion(PID) of
 	success ->
 	    post_wrf(Cfg);
 	{failure, Text} ->
@@ -140,15 +139,13 @@ run_wrf(mpi_local, Cfg) ->
 wait_for_wrf_completion(PID) ->
     receive
 	% messages from the exmon wrf monitor
-	{line, L} ->
+	{line, _L} ->
 	    % a wrf message processor should be here to scan output, predict completion
 	    % detect error conditions, etc.
 	    wait_for_wrf_completion(PID);
 	{exit_detected, 0} ->
-	    file:close(D),
 	    success;
 	{exit_detected, Code} ->
-	    file:close(D),
 	    {failure, io:format("process exited with code ~p~n", [Code])};
 	
 	% messages from command interface
