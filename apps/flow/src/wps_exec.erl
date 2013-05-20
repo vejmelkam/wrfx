@@ -51,7 +51,7 @@ make_exec_plan(Args) ->
 	   [filename:join(ExecDir, "geogrid.exe"), 
 	    [{output_type, stdout},  {in_dir, ExecDir},
 	     {exit_check, {scan_for, "Successful completion of geogrid"}},
-	     {store_to, filename:join(ExecDir, "geogrid.output")}]]},
+	     {store_output_to, filename:join(ExecDir, "geogrid.output")}]]},
 
 	  % link in all grib files with correct names GRIBFILE.AAA
 	  [ { filesys_tasks, create_symlink,
@@ -62,14 +62,14 @@ make_exec_plan(Args) ->
 	   [filename:join(ExecDir, "ungrib.exe"),
 	    [{output_type, stdout},  {in_dir, ExecDir},
 	     {exit_check, {scan_for, "Successful completion of ungrib"}},
-	     {store_to, filename:join(ExecDir, "ungrib.output")}]]},
+	     {store_output_to, filename:join(ExecDir, "ungrib.output")}]]},
 
 	  % execute metgrid.exe, store output in metgrid.output
 	  {exec_tasks, execute,
 	   [filename:join(ExecDir, "metgrid.exe"),
 	    [{output_type, stdout},  {in_dir, ExecDir},
 	     {exit_check, {scan_for, "Successful completion of metgrid"}},
-	     {store_to, filename:join(ExecDir, "metgrid.output")}]]} ],
+	     {store_output_to, filename:join(ExecDir, "metgrid.output")}]]} ],
 	  
     #plan{id=wps_exec, tasks=lists:flatten(T)}.
     

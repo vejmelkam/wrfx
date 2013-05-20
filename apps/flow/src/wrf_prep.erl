@@ -39,13 +39,13 @@ make_exec_plan(Args) ->
 	  [ { filesys_tasks, create_symlink, [filename:join(WPSExecDir, F), filename:join(ExecDir, F)] } || F <- MET_Files ],
 	  {filesys_tasks, write_file, [filename:join(ExecDir, "namelist.input"), nllist:to_text(WRFNL)]},
 	  {exec_tasks, execute, [filename:join(ExecDir, "real.exe"), 
-				 [{in_dir, ExecDir}, {output_type, real_exe_output(BuildType)},
+				 [{in_dir, ExecDir}, {output_type, real_exe_output(BuildType, ExecDir)},
 				  {exit_check, {scan_for, "SUCCESS COMPLETE REAL_EM"}},
-				  {output_to, filename:join(ExecDir, "real.output")}]]} ],
+				  {store_output_to, filename:join(ExecDir, "real.output")}]]} ],
 	  
     #plan{id=wrf_prep_exec, tasks=lists:flatten(T)}.
 
-real_exe_output(no_mpi) ->
+real_exe_output(no_mpi, _Dir) ->
     stdout;
-real_exe_output(with_mpi) ->
-    "rsl.error.0000".
+real_exe_output(with_mpi, Dir) ->
+    filename:join(Dir, "rsl.error.0000").

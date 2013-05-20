@@ -16,7 +16,7 @@ start_link() ->
 
 
 init(_Args) ->
-    {ok, Root} = application:get_env(storage_root),
+    {ok, Root} = cfg:get_conf(storage_root),
     ok = filelib:ensure_dir(filename:join(Root, "touch")),
     {ok, Root}.
 

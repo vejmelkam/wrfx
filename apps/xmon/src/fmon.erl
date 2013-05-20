@@ -32,11 +32,13 @@ start_monitor(F, Monitors) ->
 
 
 wait_for_file(continue, F, M) ->
+%    RefCmd = io_lib:format("ls -la ~s", [F]),
     case filelib:is_file(F) of
 	true ->
 	    {ok, D} = file:open(F, [read]),
 	    try_read_line(continue, D, M);
 	false ->
+%	    os:cmd(RefCmd),
 	    wait_for_file(check_for_messages(M), F, M)
     end;
 wait_for_file(stop, _F, _M) ->

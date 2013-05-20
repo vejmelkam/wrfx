@@ -4,7 +4,7 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 
 -include_lib("flow/include/flow.hrl").
--export([run_job/1, test_job/0, detect_wrf_real/1, detect_wrf_build/1]).
+-export([run_job/1, test_serial_job/0, test_mpi_job/0, detect_wrf_real/1, detect_wrf_build/1]).
 
 %
 %  Required inputs in the Cfg object
@@ -16,13 +16,14 @@
 %    - vtable_file: WPS-directory relative name of the Vtable file to use with ungrib.exe
 %
 
-test_job() ->
+test_serial_job() ->
 
+    cfg:start(),
     inets:start(),
     stor:start(),
     
-    WRFDir = "/home/martin/Projects/wrf-fire-serial/WRFV3",
-    WPSDir = "/home/martin/Projects/wrf-fire-serial/WPS",
+    WRFDir = cfg:get_conf(default_wrf),
+    WPSDir = cfg:get_conf(default_wps),
     WPSTempl = nllist:parse(filename:join(WPSDir, "namelist.wps")),
     WRFTempl = nllist:parse(filename:join(WRFDir, "run/namelist.input")),
     Cfg1 = wrf_nl:read_config(WRFTempl),
@@ -34,8 +35,8 @@ test_job() ->
 			      {wps_install_dir, WPSDir},
 			      {wrf_build_type, detect_wrf_build(WRFDir)},
 			      {wrf_exec_method, immediate},
-			      {job_name, "anjk4378"},
-			      {workspace_dir, "/home/martin/Temp"},
+			      {job_name, "testjob0"},
+			      {workspace_dir, cfg:get_conf(workspace_root)},
 			      {wps_nl_template, WPSTempl},
 			      {wrf_nl_template, WRFTempl},
 			      {nl_spec, NLSpec},
@@ -44,6 +45,48 @@ test_job() ->
 			      {history_interval_min, 15},
 			      {grib_interval_seconds, 1800},
 			      {grib_sources, [rnrs_nam218]} ],
+			      Cfg1),
+
+    run_job(Cfg).
+
+
+
+test_mpi_job() ->
+    
+    cfg:start(),
+    inets:start(),
+    stor:start(),
+    
+    {ok, WRFDir} = cfg:get_conf(default_wrf),
+    {ok, WPSDir} = cfg:get_conf(default_wps),
+    {ok, WorkspaceRoot} = cfg:get_conf(workspace_root),
+    WPSTempl = nllist:parse(filename:join(WPSDir, "namelist.wps")),
+    WRFTempl = nllist:parse(filename:join(WRFDir, "run/namelist.input")),
+    Cfg1 = wrf_nl:read_config(WRFTempl),
+
+    NLSpec = wrf_reg:create_profile_from_reg(filename:join(WRFDir, "Registry"),
+					     vanilla_wrf_v34),
+
+    From = {{2013, 5, 2}, {0, 0, 0}},
+    To = {{2013, 5, 2}, {0, 30, 0}},
+
+    Cfg = plist:update_with([ {wrf_install_dir, WRFDir},
+			      {wps_install_dir, WPSDir},
+			      {wrf_build_type, detect_wrf_build(WRFDir)},
+			      {wrf_exec_method, immediate},
+			      {job_name, "testjob-mpi-0"},
+			      {workspace_dir, WorkspaceRoot},
+			      {wps_nl_template, WPSTempl},
+			      {wrf_nl_template, WRFTempl},
+			      {nl_spec, NLSpec},
+			      {wrf_from, From},
+			      {wrf_to, To},
+			      {history_interval_min, 15},
+			      {grib_interval_seconds, atime:dt_time_diff(From, To)},
+			      {grib_sources, [rnrs_nam218]},
+			      {mpi_exec_name, "/usr/mpi/gcc/openmpi-1.4.3/bin/mpiexec"},
+			      {mpi_nprocs, 12*4},
+			      {mpi_nodes, [ "node01", "node02", "node03", "node04" ]} ],
 			      Cfg1),
 
     run_job(Cfg).
@@ -114,7 +157,7 @@ run_wrf(immediate, no_mpi, Cfg) ->
     R = exec_tasks:execute(filename:join(Dir, "wrf.exe"),
 			   [ {in_dir, Dir}, {output_type, stdout},
 			     {exit_check, {scan_for, "SUCCESS"}},
-			     {store_to, filename:join(Dir, "wrf.output")} ]),
+			     {store_output_to, filename:join(Dir, "wrf.output")} ]),
     case R of
 	{success, _Msg} ->
 	    post_wrf(Cfg);
@@ -128,17 +171,16 @@ run_wrf(immediate, with_mpi, Cfg) ->
     Dir = plist:getp(wrf_exec_dir, Cfg),
     Machines = plist:getp(mpi_nodes, Cfg),
     NP = integer_to_list(plist:getp(mpi_nprocs, Cfg)),
-    MPI = plist:getp(mpi_exec_name, Cfg),
 
     % write a machinefile into the wrf directory
     file:write_file(filename:join(Dir, "node_list"), string:join(Machines, "\n")),
 
     % execute the mpiexec/mpirun command as per configuration
-    R = exec_tasks:execute(MPI,
-			   [{in_dir, Dir}, {output_type, "rsl.error.0000"},
+    R = exec_tasks:execute(plist:getp(mpi_exec_name, Cfg),
+			   [{in_dir, Dir}, {output_type, filename:join(Dir, "rsl.error.0000")},
 			    {exit_check, {scan_for, "SUCCESS"}},
-			    {args, ["-machinefile", "node_list", "-np", NP]},
-			    {store_to, filename:join(Dir, "wrf.output")}]),
+			    {op_args, [{args, ["--machinefile", "node_list", "-n", NP, "./wrf.exe"]}]},
+			    {store_output_to, filename:join(Dir, "wrf.output")}]),
     case R of
 	{success, _Msg} ->
 	    post_wrf(Cfg);
