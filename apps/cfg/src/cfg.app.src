@@ -1,0 +1,12 @@
+{application, cfg,
+ [
+  {description, "Configuration management for the system."},
+  {vsn, "1"},
+  {registered, [cfg]},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { cfg_app, []}},
+  {env, []}
+ ]}.
