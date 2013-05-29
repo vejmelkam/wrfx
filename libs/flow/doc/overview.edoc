@@ -1,0 +1,19 @@
+
+** This is the overview file for the flow module. **
+
+@author Martin Vejmelka <vejmelkam@gmail.com>
+@copyright 2013 Martin Vejmelka, University of Colorado Denver
+@version 1.0.0
+@title FLOW planning and plan execution module
+@doc
+
+== Synopsis ==
+FLOW is a module that facilitates creation and execution of plans.  
+
+=== Plans ===
+Plans are sequences of tasks that are executed by {@link plan_runner}.
+
+=== Tasks ===
+Each task is represented by an MFA triple that must return either ''{success, Text}'' or ''{failure, Reason}''.  The {@link plan_runner} keeps executing tasks until the plan is completed or a task returns a failure.
+
+
