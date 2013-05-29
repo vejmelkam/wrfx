@@ -1,64 +1,108 @@
 
 
--module(stor).
+-module(wrfx_stor).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -behavior(gen_server).
 
--export([ensure_location/2, resolve/2, check_exists/2, remove/2, store/3,  % API
-	 init/1, handle_call/3, handle_cast/2,  handle_info/2, terminate/2, code_change/3,
-	 start_link/0, start/0, stop_storage/0]).
+-define(SERVER, ?MODULE).
 
-start() ->
-    application:start(stor).
+%% ------------------------------------------------------------------
+%% API Function Exports
+%% ------------------------------------------------------------------
+
+-export([start_link/0]).
+-export([file_resolve/1, file_exists/1, file_remove/1, file_store/2]).  % file API
+-export([namelist_store/2, namelist_retrieve/1, namelist_all/0]).       % nl API
+-export([stop_storage/0]).
+
+%% ------------------------------------------------------------------
+%% gen_server Function Exports
+%% ------------------------------------------------------------------
+
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+         terminate/2, code_change/3]).
+
+%% ------------------------------------------------------------------
+%% API Function Definitions
+%% ------------------------------------------------------------------
 
 start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
+%% @type id() = {string(), string()}
+
+%% @spec file_store(ID::id(), File::string()) -> {success, Path} | {failure, Reason}
+file_store(ID, File) ->
+    gen_server:call(?SERVER, {file_store, ID, File}).
+
+%% @spec file_resolve(ID::id()) -> string()
+file_resolve(ID) -> 
+    gen_server:call(?SERVER, {file_resolve, ID}).
+
+%% @spec file_exists(ID::id()) -> {true, F} | false
+file_exists(ID) ->
+    gen_server:call(?SERVER, {file_exists, ID}).
+
+%% @spec file_remove(ID::id()) -> success | {failure, R}
+file_remove(ID) ->
+    gen_server:call(?SERVER, {file_remove, ID}).
+
+stop_storage() ->
+    gen_server:call(?SERVER, terminate).
+
+
+namelist_all() ->
+    gen_server:call(?SERVER, nl_list).
+
+namelist_store(ID, NL) ->
+    gen_server:call(?SERVER, {nl_store, ID, NL}).
+
+namelist_retrieve(ID) ->
+    gen_server:call(?SERVER, {nl_retrieve, ID}).
+
+
+%% ------------------------------------------------------------------
+%% gen_server Function Definitions
+%% ------------------------------------------------------------------
 
 init(_Args) ->
-    {ok, Root} = cfg:get_conf(storage_root),
+    {ok, Root} = wrfx_cfg:get_conf(storage_root),
+    Tab = open_or_init_ets(Root),
     ok = filelib:ensure_dir(filename:join(Root, "touch")),
-    {ok, Root}.
+    {ok, {Tab, Root}}.
 
 
-handle_call({store, Domain, ID, File}, _From, Root) ->
-    Dest = filename:join([Root, Domain, ID]),
-    case file:rename(File, Dest) of
+handle_call({file_store, {Dom, Name}, F}, _From, S={_Tab, Root}) ->
+    Dst = filename:join([Root, Dom, Name]),
+    case filelib:ensure_dir(Dst) of
 	ok ->
-	    {reply, success, Root};
-	{error, R} ->
-	    {reply, {failure, R}, Root}
+	    R = move_or_copy(F, Dst),
+	    {reply, R, S};
+	{error, E} ->
+	    {reply, {failure, E}, S}
     end;
 
-handle_call({ensure_location, Domain, ID}, _From, Root) ->
-    F = filename:join([Root, Domain, ID]),
-    case filelib:ensure_dir(F) of
-	ok ->
-	    {reply, {success, F}, Root};
-	{error, _E} ->
-	    {reply, {failure, F}, Root}
-    end;
 
-handle_call({remove, Dom, ID}, _From, Root) ->
-    F = filename:join([Root, Dom, ID]),
+handle_call({file_remove, {Dom, Name}}, _From, S={_Tab, Root}) ->
+    F = filename:join([Root, Dom, Name]),
     case file:delete(F) of
 	ok ->
-	    {reply, success, Root};
+	    {reply, success, S};
 	{error, R} ->
-	    {reply, {failure, R}, Root}
+	    {reply, {failure, R}, S}
     end;
 
-handle_call({resolve, Domain, ID}, _From, Root) ->
-    F = filename:join([Root, Domain, ID]),
-    {reply, F, Root};
+handle_call({file_resolve, {Dom, Name}}, _From, S={_Tab, Root}) ->
+    F = filename:join([Root, Dom, Name]),
+    {reply, F, S};
 
-handle_call({check_exists, Domain, ID}, _From, Root) ->
-    F = filename:join([Root, Domain, ID]),
+handle_call({file_exists, {Dom, Name}}, _From, S={_Tab,Root}) ->
+    F = filename:join([Root, Dom, Name]),
     case filelib:is_file(F) of
 	true ->
-	    {reply, F, Root};
+	    {reply, {true, F}, S};
 	false ->
-	    {reply, not_found, Root}
+	    {reply, false, S}
     end;
 
 
@@ -83,23 +127,31 @@ handle_cast(_Req, State) ->
     {noreply, State}.
 
 
+%% ------------------------------------------------------------------
+%% Internal Function Definitions
+%% ------------------------------------------------------------------
 
-store(Dom, ID, File) ->
-    gen_server:call(stor, {store, Dom, ID, File}).
+open_or_init_ets(R) ->
+    F = filename:join(R, ".wrfx.db"),
+    case filelib:is_regular(F) of
+	true ->
+	    {ok, Tab} = ets:file2tab(F);
+	false ->
+	    Tab = ets:new(wrfx_namelists, [])
+    end,
+    Tab.
+	
 
-ensure_location(Dom, ID) ->
-    gen_server:call(stor, {ensure_location, Dom, ID}).
 
+move_or_copy(Src, Dst) ->
+    case file:rename(Src, Dst) of
+	ok ->
+	    {success, Dst};
+	{error, exdev} ->
+	    {ok, _} = file:copy(Src, Dst),
+	    ok = file:delete(Src),
+	    {success, Dst};
+	{error, R} ->
+	    {failure, R}
+    end.
 
-resolve(Dom, ID) -> 
-    gen_server:call(stor, {resolve, Dom, ID}).
-
-
-check_exists(Dom, ID) ->
-    gen_server:call(stor, {check_exists, Dom, ID}).
-
-remove(Dom, ID) ->
-    gen_server:call(stor, {remove, Dom, ID}).
-
-stop_storage() ->
-    gen_server:call(stor, terminate).

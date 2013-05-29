@@ -32,7 +32,6 @@ read_config(NL) ->
 
 
 read_time_range(TC, P) ->
-
     TS = {list_to_tuple(nlist:entries(["start_year", "start_month", "start_day"], TC)),
 	  list_to_tuple(nlist:entries(["start_hour", "start_minute", "start_second"], TC))},
     TE = {list_to_tuple(nlist:entries(["end_year", "end_month", "end_day"], TC)),

@@ -5,6 +5,7 @@ deps
 *.plt
 *~
 ebin
-apps/wrfnl/data
-apps/wrfnl/src/nllparser.erl
-apps/wrfnl/logs
+libs/nl/data
+libs/nl/src/nllparser.erl
+*.html
+doc

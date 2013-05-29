@@ -6,8 +6,10 @@
 -include_lib("flow/include/flow.hrl").
 -export([run_job/1, test_serial_job/0, test_mpi_job/0, detect_wrf_real/1, detect_wrf_build/1]).
 
-%
-%  Required inputs in the Cfg object
+%% @doc
+%% It's still not clear how to generate and store complex plans (jobs).
+%% For now a job plan is generated at run time using a class such as this.
+%% The job is configured using a plist, which must contain (for this job):
 %
 %    - wps_nl_template: a WPS namelist (as parsed by nllist:parse/1)
 %    - wrf_nl_template: a WRF namelist (as parsed by nllist:parse/1)
@@ -18,15 +20,14 @@
 
 test_serial_job() ->
 
-    cfg:start(),
-    inets:start(),
-    stor:start(),
+    wrfx:start(),
     
-    WRFDir = cfg:get_conf(default_wrf),
-    WPSDir = cfg:get_conf(default_wps),
+    {ok, WRFDir} = wrfx_cfg:get_conf(serial_wrf_34),
+    {ok, WPSDir} = wrfx_cfg:get_conf(serial_wps_34),
     WPSTempl = nllist:parse(filename:join(WPSDir, "namelist.wps")),
     WRFTempl = nllist:parse(filename:join(WRFDir, "run/namelist.input")),
     Cfg1 = wrf_nl:read_config(WRFTempl),
+    {ok, Wrkspc} = wrfx_cfg:get_conf(workspace_root),
 
     NLSpec = wrf_reg:create_profile_from_reg(filename:join(WRFDir, "Registry"),
 					     vanilla_wrf_v34),
@@ -36,7 +37,7 @@ test_serial_job() ->
 			      {wrf_build_type, detect_wrf_build(WRFDir)},
 			      {wrf_exec_method, immediate},
 			      {job_name, "testjob0"},
-			      {workspace_dir, cfg:get_conf(workspace_root)},
+			      {workspace_dir, Wrkspc},
 			      {wps_nl_template, WPSTempl},
 			      {wrf_nl_template, WRFTempl},
 			      {nl_spec, NLSpec},
@@ -53,13 +54,9 @@ test_serial_job() ->
 
 test_mpi_job() ->
     
-    cfg:start(),
-    inets:start(),
-    stor:start(),
-    
-    {ok, WRFDir} = cfg:get_conf(default_wrf),
-    {ok, WPSDir} = cfg:get_conf(default_wps),
-    {ok, WorkspaceRoot} = cfg:get_conf(workspace_root),
+    {ok, WRFDir} = wrfx_cfg:get_conf(default_wrf),
+    {ok, WPSDir} = wrfx_cfg:get_conf(default_wps),
+    {ok, WorkspaceRoot} = wrfx_cfg:get_conf(workspace_root),
     WPSTempl = nllist:parse(filename:join(WPSDir, "namelist.wps")),
     WRFTempl = nllist:parse(filename:join(WRFDir, "run/namelist.input")),
     Cfg1 = wrf_nl:read_config(WRFTempl),
@@ -119,7 +116,7 @@ run_job(Cfg) ->
     Cfg3 = make_namelists(Cfg2),
 
     % plan & execute WPS job
-    Plan = wps_exec:make_exec_plan(Cfg3),
+    Plan = plan_wps_exec:make_exec_plan(Cfg3),
     io:format("wps_exec plan has ~p steps.~n", [plan:count_steps(Plan)]),
 
     PID = plan_runner:execute_plan(Plan),
@@ -135,7 +132,7 @@ run_job(Cfg) ->
 prep_wrf(Cfg) ->
 
     % Make an execution plan and run it (this does everything except submitting the wrf_job
-    Plan = wrf_prep:make_exec_plan(Cfg),
+    Plan = plan_wrf_prep:make_exec_plan(Cfg),
     io:format("wrf_prep plan has ~p steps.~n", [plan:count_steps(Plan)]),
 
     % Find execution method to use
@@ -154,7 +151,7 @@ prep_wrf(Cfg) ->
 
 run_wrf(immediate, no_mpi, Cfg) ->
     Dir = plist:getp(wrf_exec_dir, Cfg),
-    R = exec_tasks:execute(filename:join(Dir, "wrf.exe"),
+    R = tasks_exec:execute(filename:join(Dir, "wrf.exe"),
 			   [ {in_dir, Dir}, {output_type, stdout},
 			     {exit_check, {scan_for, "SUCCESS"}},
 			     {store_output_to, filename:join(Dir, "wrf.output")} ]),
@@ -176,7 +173,7 @@ run_wrf(immediate, with_mpi, Cfg) ->
     file:write_file(filename:join(Dir, "node_list"), string:join(Machines, "\n")),
 
     % execute the mpiexec/mpirun command as per configuration
-    R = exec_tasks:execute(plist:getp(mpi_exec_name, Cfg),
+    R = tasks_exec:execute(plist:getp(mpi_exec_name, Cfg),
 			   [{in_dir, Dir}, {output_type, filename:join(Dir, "rsl.error.0000")},
 			    {exit_check, {scan_for, "SUCCESS"}},
 			    {op_args, [{args, ["--machinefile", "node_list", "-n", NP, "./wrf.exe"]}]},
@@ -200,15 +197,14 @@ post_wrf(Cfg) ->
     WRFL = [ "namelist.input", "real.output", "wrf.output" ],
 
     Dom = "outputs/" ++ JN,
-    stor:ensure_location(Dom, "test_file"),
 
     % store all fixed files
-    lists:map(fun (X) -> stor:store(Dom, X, filename:join(WPSDir, X)) end, WPSL),
-    lists:map(fun (X) -> stor:store(Dom, X, filename:join(WRFDir, X)) end, WRFL),
+    lists:map(fun (X) -> wrfx_stor:file_store({Dom, X}, filename:join(WPSDir, X)) end, WPSL),
+    lists:map(fun (X) -> wrfx_stor:file_store({Dom, X}, filename:join(WRFDir, X)) end, WRFL),
 
     % store wrfout files
     WRFOuts = filesys:list_dir_regexp(WRFDir, "wrfout.+"),
-    lists:map(fun (X) -> stor:store(Dom, X, filename:join(WRFDir, X)) end, WRFOuts),
+    lists:map(fun (X) -> wrfx_stor:file_store({Dom, X}, filename:join(WRFDir, X)) end, WRFOuts),
 
     % clean out and remove directories
     filesys:remove_directory(plist:getp(wps_exec_dir, Cfg)),
@@ -232,21 +228,20 @@ retrieve_grib_files(R, From, To) ->
 retrieve_grib_files(_Dom, _URL, [], List) ->
     List;
 
-retrieve_grib_files(Dom, URLBase, [ID|IDs], List) ->
-    case stor:check_exists(Dom, ID) of
-	not_found ->
-	    {success, F} = stor:ensure_location(Dom, ID),
-	    io:format("Downloading [~p]~n", [URLBase ++ ID]),
-	    {success, _} = network_tasks:http_sync_get(URLBase ++ ID, F),
-	    retrieve_grib_files(Dom, URLBase, IDs, [F|List]);
-	F ->
-	    retrieve_grib_files(Dom, URLBase, IDs, [F|List])
+retrieve_grib_files(Dom, URLBase, [Name|Names], List) ->
+    case wrfx_stor:file_exists({Dom, Name}) of
+	false ->
+	    io:format("Downloading [~p]~n", [URLBase ++ Name]),
+	    {success, _} = tasks_net:http_sync_get(URLBase ++ Name, "/tmp/wrfx-download"),
+	    {success, F} = wrfx_stor:file_store({Dom, Name}, "/tmp/wrfx-download"),
+	    retrieve_grib_files(Dom, URLBase, Names, [F|List]);
+	{true, F} ->
+	    retrieve_grib_files(Dom, URLBase, Names, [F|List])
     end.
 
     
 
 detect_wrf_real(WRFRoot) ->
-
     FileList = [ "run/wrf.exe", "run/real.exe" ],
     P = #plan{id = check_wrf_installation,
 	      tasks = [ {filesys_tasks, file_exists, [ filename:join(WRFRoot, F) ] } || F <- FileList ]},

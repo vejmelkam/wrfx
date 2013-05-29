@@ -1,5 +1,5 @@
 
--module(network_tasks).
+-module(tasks_net).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 
 -export([http_sync_get/2]).

@@ -1,13 +1,21 @@
 
--module(filesys_tasks).
+
+%% @doc
+%% Module containing tasks that primarily involve the file system.
+%% @end
+
+-module(tasks_fsys).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -export([dir_exists/1, file_exists/1,
 	 create_dir/1, create_symlink/2,
 	 write_file/2, delete_file/1]).
 
 
+%% @doc Checks if a file exists (as a regular file) on the filesystem.
+%% Wraps {@link filelib:is_regular/1}.
+%% @spec file_exists(F::string()) -> {success, string()}|{failure, string()}
 file_exists(F) ->
-    case filelib:is_file(F) of
+    case filelib:is_regular(F) of
 	true ->
 	    {success, io_lib:format("file ~p exists.", [F])};
 	false ->
@@ -15,6 +23,8 @@ file_exists(F) ->
     end.
 
 
+%% @doc Checks if a directory exists on the filesystem.
+%% @spec dir_exists(D::string()) -> {success, string()}|{failure, string()}
 dir_exists(D) ->
     case filelib:is_dir(D) of
 	true ->
@@ -23,7 +33,8 @@ dir_exists(D) ->
 	    {failure, check_dir_exists_task, io_lib:format("source directory ~p does not exist.", [D])}
     end.
 
-
+%% @doc Create a directory on the filesystem.
+%% @spec create_dir(D::string()) -> {success, string()}|{failure, string()}
 create_dir(D) ->
     case filelib:ensure_dir(filename:join(D, "test_file")) of
 	ok ->
@@ -33,30 +44,36 @@ create_dir(D) ->
     end.
 
 
-create_symlink(Existing, New) ->
-    case file:make_symlink(Existing, New) of
+%% @doc Creates a symlink to a file (file must exist).
+%% @spec create_symlink(F::string(), L::string()) -> {success, string()}|{failure, string()}
+create_symlink(F, L) ->
+    case file:make_symlink(F, L) of
 	ok ->
-	    {success, io_lib:format("created symlink [~p] -> [~p].~n", [New, Existing])};
+	    {success, io_lib:format("created symlink [~p] -> [~p].~n", [L, F])};
 	{error, E} ->
-	    {failure, io_lib:format("failed to create symlink [~p] -> [~p] with error [~p].~n", [New, Existing, E])}
+	    {failure, io_lib:format("failed to create symlink [~p] -> [~p] with error [~p].~n", [L, F, E])}
     end.
 
 
-write_file(Fname, Content) ->
-    case file:write_file(Fname, Content) of
+%% @doc Writes the content to a file.  The directory of the file must exist.  Wraps {@link file:write_file/2}.
+%% @spec write_file(F::string(), C::iodata()) -> {success, string()}|{failure, string()}
+write_file(F, C) ->
+    case file:write_file(F, C) of
 	ok ->
-	    {success, io_lib:format("content written to [~p].~n", [Fname])};
+	    {success, io_lib:format("content written to [~p].~n", [F])};
 	{error, R} ->
-	    {failure, io_lib:format("could not write to [~p] with error [~p].~n", [Fname, R])}
+	    {failure, io_lib:format("could not write to [~p] with error [~p].~n", [F, R])}
     end.
 
 
-delete_file(Fname) ->
-    case file:delete(Fname) of
+%% @doc Removes a file from the filesystem, wraps {@link file:delete/1}.
+%% @spec delete_file(F::string()) -> {success, string()}|{failure, string()}
+delete_file(F) ->
+    case file:delete(F) of
 	ok ->
-	    {success, io_lib:format("file [~p] deleted.~n", [Fname])};
+	    {success, io_lib:format("file [~p] deleted.~n", [F])};
 	{error, enoent} ->
-	    {success, io_lib:format("file [~p] is non-existent, skipping.~n", [Fname])};
+	    {success, io_lib:format("file [~p] is non-existent, skipping.~n", [F])};
 	{error, E} ->
-	    {failure, io_lib:format("error [~p] encountered while deleting file [~p]~n", [E, Fname])}
+	    {failure, io_lib:format("error [~p] encountered while deleting file [~p]~n", [E, F])}
     end.

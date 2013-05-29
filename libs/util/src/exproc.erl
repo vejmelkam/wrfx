@@ -6,9 +6,9 @@
 %
 
 
--module(exmon).
+-module(exproc).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([run/3, kill9/1,wait_for_completion/1]).
+-export([run_and_monitor/3, kill9/1, wait_for_completion/1]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -26,7 +26,7 @@ wait_for_completion(PID) ->
     end.
 
 
-run(ExFile, Opts, Monitors) ->
+run_and_monitor(ExFile, Opts, Monitors) ->
     S = self(),
     Owner = case lists:member(S, Monitors) of
 		true ->
@@ -50,18 +50,18 @@ monitor_process(P, Owner, Monitors) ->
 	    os:cmd(io_lib:format("kill -9 ~p", [OsPid])),
 	    monitor_process(P, Owner, Monitors);
 	{_From, {data, {eol, Line}}} ->
-	    router:multicast({self(), line, Line}, Monitors),
+	    msg_router:multicast({self(), line, Line}, Monitors),
 	    monitor_process(P, Owner, Monitors);
 	{_From, {exit_status, S}} ->
 	    % Owner is always notified that the process exited
 	    case Owner of
 		dont_send ->
-		    router:multicast({self(), exit_detected, S}, Monitors);
+		    msg_router:multicast({self(), exit_detected, S}, Monitors);
 		PID ->
-		    router:multicast({self(), exit_detected, S}, [PID|Monitors])
+		    msg_router:multicast({self(), exit_detected, S}, [PID|Monitors])
 	    end;
 	M ->
-	    io:format("exmon: unexpected message ~p~n", [M]),
+	    io:format("mon_exec: unexpected message ~p~n", [M]),
 	    monitor_process(P, Owner, Monitors)
     end.
 

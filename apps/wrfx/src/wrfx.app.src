@@ -1,11 +1,13 @@
 {application, wrfx,
  [
-  {description, ""},
+  {description, "The WRF-x application server."},
   {vsn, "1"},
-  {registered, []},
+  {registered, [wrfx, wrfx_cfg, wrfx_stor, wrfx_sched]},
+  {modules, [wrfx, wrfx_cfg, wrfx_stor, wrfx_sched]},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+		  inets
                  ]},
   {mod, { wrfx_app, []}},
   {env, []}

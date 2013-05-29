@@ -1,5 +1,9 @@
 
 %% the plan record
--record(plan, {id,        % id of the plan
-	       tasks      % a list of tasks to be performed to execute the plan
+%% @type plan() = #plan{id::atom(), tasks::[task()]}
+
+-type task() :: { term(), term(), list() }.
+
+-record(plan, {id :: atom(),        % id of the plan
+	       tasks :: [task()]    % a list of tasks
 	      }).

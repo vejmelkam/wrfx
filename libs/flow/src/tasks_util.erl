@@ -1,6 +1,6 @@
 
 
--module(util_tasks).
+-module(tasks_util).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -export([sleep_ms/1]).
 

@@ -1,20 +1,20 @@
 
-%
-%  This subsystem runs the WPS module assuming that
-%
-%  - a workspace is available (exec_dir can be created)
-%  - GRIB files are available
-%  - the Vtable file is known for the GRIB data
-%  - a namelist for WPS is available
-%  - an installation of WPS exists in wps_dir
-%  - the WRF root directory contains a valid WPS/WRF setup (GEOGRID.TBL pointing to the right file, etc.)
-%
-%
-%  The plan produces in the exec_dir met_em* files which must
-%  be linked into the directory in which wrf.exe is executed.
-%
+%% @doc
+%%  This subsystem runs the WPS module assuming that
+%%
+%%  - a workspace is available (exec_dir can be created)
+%%  - GRIB files are available
+%%  - the Vtable file is known for the GRIB data
+%%  - a namelist for WPS is available
+%%  - an installation of WPS exists in wps_dir
+%%  - the WRF root directory contains a valid WPS/WRF setup (GEOGRID.TBL pointing to the right file, etc.)
+%%
+%%
+%%  The plan produces in the exec_dir met_em* files which must
+%%  be linked into the directory in which wrf.exe is executed.
+%% @end
 
--module(wps_exec).
+-module(plan_wps_exec).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -include("include/flow.hrl").
 -export([make_exec_plan/1]).
@@ -32,40 +32,40 @@ make_exec_plan(Args) ->
     Files = ["geogrid.exe", "geogrid", "metgrid.exe", "metgrid", "ungrib.exe", "ungrib"],
 
     T = [ % create target directory
-	  {filesys_tasks, create_dir, [ExecDir]},
+	  {tasks_fsys, create_dir, [ExecDir]},
 
 	  % symlink files from install to execution directory
-	  [ { filesys_tasks, create_symlink,
+	  [ { tasks_fsys, create_symlink,
 	      [filename:join(WPSDir, F), filename:join(ExecDir, F)] } || F <- Files ],
 
 	  % symlink vtable (depends on GRIB file source)
-	  { filesys_tasks, create_symlink,
+	  { tasks_fsys, create_symlink,
 	    [filename:join(WPSDir, Vtable), filename:join(ExecDir, "Vtable")] },
 
 	  % write the constructed WPS namelist into namelist.wps
-	  {filesys_tasks, write_file,
+	  {tasks_fsys, write_file,
 	   [filename:join(ExecDir, "namelist.wps"), nllist:to_text(WPSNL)]},
 
 	  % run geogrid.exe, store output in geogrid.output
-	  {exec_tasks, execute,
+	  {tasks_exec, execute,
 	   [filename:join(ExecDir, "geogrid.exe"), 
 	    [{output_type, stdout},  {in_dir, ExecDir},
 	     {exit_check, {scan_for, "Successful completion of geogrid"}},
 	     {store_output_to, filename:join(ExecDir, "geogrid.output")}]]},
 
 	  % link in all grib files with correct names GRIBFILE.AAA
-	  [ { filesys_tasks, create_symlink,
+	  [ { tasks_fsys, create_symlink,
 	      [X, filename:join(ExecDir, Y)]} || {X,Y} <- make_grib_names(GRIBFiles) ],
 
 	  % execute ungrib.exe, store output in ungrib.output
-	  {exec_tasks, execute,
+	  {tasks_exec, execute,
 	   [filename:join(ExecDir, "ungrib.exe"),
 	    [{output_type, stdout},  {in_dir, ExecDir},
 	     {exit_check, {scan_for, "Successful completion of ungrib"}},
 	     {store_output_to, filename:join(ExecDir, "ungrib.output")}]]},
 
 	  % execute metgrid.exe, store output in metgrid.output
-	  {exec_tasks, execute,
+	  {tasks_exec, execute,
 	   [filename:join(ExecDir, "metgrid.exe"),
 	    [{output_type, stdout},  {in_dir, ExecDir},
 	     {exit_check, {scan_for, "Successful completion of metgrid"}},

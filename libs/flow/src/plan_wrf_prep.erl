@@ -1,15 +1,16 @@
 
-%
-%  This planner prepares a WRF run.  Prerequisites are:
-%
-%  - a workspace is available (wrf_exec_dir can be created)
-%  - met_em* files have been generated in wps_exec_dir
-%  - a namelist for WRF is prepared and available as wrf_nl
-%  - a valid run directory is in wrf_root_dir/WRFV3/run
-%  - the WRF root directory contains a valid WPS/WRF setup
-%
+%% @author Martin Vejmelka <vejmelka@gmail.com>
+%% @doc
+%%  This planner prepares a WRF run.  Prerequisites are:
+%%
+%%  - a workspace is available (wrf_exec_dir can be created)
+%%  - met_em* files have been generated in wps_exec_dir
+%%  - a namelist for WRF is prepared and available as wrf_nl
+%%  - a valid run directory is in wrf_root_dir/WRFV3/run
+%%  - the WRF root directory contains a valid WPS/WRF setup
+%% @end
 
--module(wrf_prep).
+-module(plan_wrf_prep).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -include("include/flow.hrl").
 -export([make_exec_plan/1]).
@@ -34,11 +35,11 @@ make_exec_plan(Args) ->
 
     MET_Files = filesys:list_dir_regexp(WPSExecDir, "met_em.+"),
 
-    T = [ {filesys_tasks, create_dir, [ExecDir]},
-	  [ { filesys_tasks, create_symlink, [filename:join(WRFDir, F), filename:join(ExecDir, F)] } || F <- Files ],
-	  [ { filesys_tasks, create_symlink, [filename:join(WPSExecDir, F), filename:join(ExecDir, F)] } || F <- MET_Files ],
-	  {filesys_tasks, write_file, [filename:join(ExecDir, "namelist.input"), nllist:to_text(WRFNL)]},
-	  {exec_tasks, execute, [filename:join(ExecDir, "real.exe"), 
+    T = [ {tasks_fsys, create_dir, [ExecDir]},
+	  [ { tasks_fsys, create_symlink, [filename:join(WRFDir, F), filename:join(ExecDir, F)] } || F <- Files ],
+	  [ { tasks_fsys, create_symlink, [filename:join(WPSExecDir, F), filename:join(ExecDir, F)] } || F <- MET_Files ],
+	  {tasks_fsys, write_file, [filename:join(ExecDir, "namelist.input"), nllist:to_text(WRFNL)]},
+	  {tasks_exec, execute, [filename:join(ExecDir, "real.exe"), 
 				 [{in_dir, ExecDir}, {output_type, real_exe_output(BuildType, ExecDir)},
 				  {exit_check, {scan_for, "SUCCESS COMPLETE REAL_EM"}},
 				  {store_output_to, filename:join(ExecDir, "real.output")}]]} ],

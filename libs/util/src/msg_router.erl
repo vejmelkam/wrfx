@@ -1,13 +1,12 @@
 
 
-%
-%
-%  Initial simple design of a publish/subscribe notification infrastructure.
-%
-%
+%% @doc
+%%  An incipient message router.  Currently unused in the application except for
+%% the {@link multicast/2} function, which allows sending messages to multiple
+%% targets.
 
 
--module(router).
+-module(msg_router).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -export([send/2, subscribe/1, unsubscribe/1,
 	start/0, multicast/2]).

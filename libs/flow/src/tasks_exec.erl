@@ -8,7 +8,7 @@
 %  - capture the exit code of the process
 %
 
--module(exec_tasks).
+-module(tasks_exec).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -export([execute/2]).
 
@@ -31,28 +31,28 @@ execute(Cmd, Opts) ->
 
 execute_capture_stdout(Cmd, InDir, Monitors, StoreFile, ExtraOP, ExitCheck) ->
     % starts file sink which copies stdout of program to desired storage
-    FS = file_sink:start(StoreFile),
+    FS = sink_file:start(StoreFile),
 
     % run the external command and monitor execution until done
-    XPID = exmon:run(Cmd, [{cd, InDir}|ExtraOP], [FS|Monitors]),
+    XPID = exproc:run_and_monitor(Cmd, [{cd, InDir}|ExtraOP], [FS|Monitors]),
     C = wait_for_completion(XPID),
 
     % close the file sink
-    file_sink:stop(FS),
+    sink_file:send_eof(FS),
  
     evaluate_result(ExitCheck, C, StoreFile, Cmd).
 
 
 execute_capture_file(Cmd, InDir, Monitors, CaptureFile, StoreFile, ExtraOP, ExitCheck) ->
     % starts a file monitor of the file to which program outputs
-    FM = fmon:start(CaptureFile, Monitors),
+    FM = file_monitor:start(CaptureFile, Monitors),
 
     % run the external command and monitor execution until done
-    XPID = exmon:run(Cmd, [{cd, InDir}|ExtraOP], []),
+    XPID = exproc:run(Cmd, [{cd, InDir}|ExtraOP], []),
     C = wait_for_completion(XPID),
 
     % close the file monitor
-    fmon:stop(FM),
+    file_monitor:stop(FM),
     file:rename(CaptureFile, StoreFile),
     evaluate_result(ExitCheck, C, StoreFile, Cmd).
 
@@ -61,7 +61,7 @@ execute_capture_file(Cmd, InDir, Monitors, CaptureFile, StoreFile, ExtraOP, Exit
 wait_for_completion(XPID) ->
     receive
 	kill ->
-	    exmon:kill9(XPID),
+	    exproc:kill9(XPID),
 	    wait_for_completion(XPID);
 	{XPID, exit_detected, S} ->
 	    S

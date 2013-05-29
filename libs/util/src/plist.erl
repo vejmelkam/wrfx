@@ -36,9 +36,10 @@ setp(K, V, [{K1,V1}|P]) ->
     [{K1,V1}|setp(K, V, P)].
 
 
-% getp intentionally does not have a function for getp(K, [])
-% since requesting a key that's not in the plist is an error
+% Requesting a key that's not in the plist is an error
 % that needs to be fixed in the caller
+getp(K, []) ->
+    throw({not_found, K});
 getp(K, [{K,V}|_P]) ->
     V;
 getp(K, [_E|P]) ->
@@ -53,8 +54,8 @@ getp(K, [_NoMatch|Rest], Def) ->
     getp(K, Rest, Def).
 
 
-get_list(K, P) ->
-    [ getp(X, P) || X <- K ].
+get_list(Ks, P) ->
+    [ getp(K, P) || K <- Ks ].
 
 
 contains(_K, []) ->
