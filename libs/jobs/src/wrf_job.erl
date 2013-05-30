@@ -22,7 +22,7 @@ check_config(C) ->
 	    {false, {missing_keys, Missing}};
 	true ->
 	    WrfId = plist:getp(wrf_id, C),
-	    {ok, WRFDir} = wrfx_cfg:get_conf(WrfId),
+	    WRFDir = wrfx_db:get_conf(WrfId),
 	    BT = wrf_inst:detect_build_type(WRFDir),
 	    check_run_config(BT, C)
     end.
@@ -54,9 +54,6 @@ test_serial_job() ->
 
     wrfx:start(),
     
-%    {ok, WRFDir} = wrfx_cfg:get_conf(serial_wrf_34),
-%    {ok, WPSDir} = wrfx_cfg:get_conf(default_wps),
-
     Cfg = [ {wrf_id, serial_wrf_34},
 	    {wps_id, default_wps},
 	    {wrf_build_type, no_mpi},
@@ -122,8 +119,8 @@ run_job(CfgOverw) ->
     end,
 
     % retrieve the installation directories
-    {ok, WRFInstDir} = wrfx_cfg:get_conf(plist:getp(wrf_id, Cfg)),
-    {ok, WPSInstDir} = wrfx_cfg:get_conf(plist:getp(wps_id, Cfg)),
+    WRFInstDir = wrfx_db:get_conf(plist:getp(wrf_id, Cfg)),
+    WPSInstDir = wrfx_db:get_conf(plist:getp(wps_id, Cfg)),
 
     % build a namelist specification from the registry in wrf dir
     NLSpec = wrf_reg:create_profile_from_reg(filename:join(WRFInstDir, "Registry"),
@@ -137,7 +134,7 @@ run_job(CfgOverw) ->
     {{WPSFrom, WPSTo}, VtableFile, GribFiles} = retrieve_grib_files(R, From, To),
 
     % construct temporary workspaces from job name
-    {ok, Wkspace} = wrfx_cfg:get_conf(workspace_root),
+    Wkspace = wrfx_db:get_conf(workspace_root),
     WPSExecDir = filename:join(Wkspace, "wps_exec_dir_for_" ++ JN),
     WRFExecDir = filename:join(Wkspace, "wrf_exec_dir_for" ++ JN),
 

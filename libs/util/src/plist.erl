@@ -9,7 +9,7 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 
 -export([new/0, keys/1, props/1, 
-	 setp/3, getp/2, getp/3, get_list/2, contains/2, contains_keys/2,
+	 setp/3, getp/2, getp/3, remove_key/2, get_list/2, contains/2, contains_keys/2,
 	 update_with/2, update_with/3,
 	 store/2, load/1]).
 
@@ -78,6 +78,15 @@ contains_keys([K|Ks], P, Missing) ->
 	false ->
 	    contains_keys(Ks, P, [K|Missing])
     end.
+
+remove_key(K, P) ->
+    remove_key(K, P, []).
+remove_key(K, [], A) ->
+    lists:reverse(A);
+remove_key(K, [{K, _V}|Ps], A) ->
+    remove_key(K, Ps, A);
+remove_key(K, [P|Ps], A) ->
+    remove_key(K, Ps, [P|A]).
 
 
 update_with(UP, P) ->

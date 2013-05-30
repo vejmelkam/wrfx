@@ -10,6 +10,10 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
+    % ensure the database backend is ready
+    wrfx_db:start(),
+
+    % start application supervisor
     wrfx_sup:start_link().
 
 stop(_State) ->

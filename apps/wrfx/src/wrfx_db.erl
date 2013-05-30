@@ -11,8 +11,8 @@
 -define(SERVER, ?MODULE).
 
 -export([start/0, stop/0]).
--export([store/1, lookup/1, lookup/2, list/1, delete/1]).
-
+-export([store/1, lookup/1, lookup/2, list_keys/1, all/1, delete/1]).
+-export([get_conf/1, set_conf/2]).
 
 %% @doc Starts mnesia if not already running and ensures that
 %% tables required for system operations are available.
@@ -20,12 +20,20 @@
 start() ->
     mnesia:create_schema([node()]),
     mnesia:start(),
-    ensure_tables().
+    ensure_tables(),
+    mnesia:wait_for_tables([wrfx_cfg], 5000).
 
 %% @doc Stops mnesia.
 stop() ->
     mnesia:stop().
 
+
+get_conf(K) ->
+    {success, {wrfx_cfg, K, V}} = lookup({wrfx_cfg, K}),
+    V.
+
+set_conf(K, V) ->
+    store({wrfx_cfg, K, V}).
 
 %% @doc Stores the record in a table with the same name as the record.
 %% @spec store(R::tuple()) -> success | {failure, Reason}
@@ -48,7 +56,7 @@ lookup(R,N) when N > 1 ->
     end.
 
 
-list(T) ->
+list_keys(T) ->
     try
 	Ks = mnesia:dirty_all_keys(T),
 	{success, Ks}
@@ -57,10 +65,14 @@ list(T) ->
 	    {failure, R}
     end.
 
+all(T) ->
+    {atomic, R} = mnesia:transaction(fun () -> mnesia:foldl(fun (X, A) -> [X|A] end, [], T) end, 1),
+    R.
+
 
 wrap_dirty_fun(F) ->
     try
-	F,
+	ok = F(),
 	success
     catch
 	{'EXIT', {aborted, R}} ->
@@ -69,7 +81,7 @@ wrap_dirty_fun(F) ->
 	
 
 ensure_tables() ->
-    lists:foreach(fun ensure_table/1, [nllist, cfg]),
+    lists:foreach(fun ensure_table/1, [nllist, wrfx_cfg, fields, job_desc]),
     ok.
 
 

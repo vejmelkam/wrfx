@@ -58,7 +58,7 @@ stop_storage() ->
 %% ------------------------------------------------------------------
 
 init(_Args) ->
-    {ok, Root} = wrfx_cfg:get_conf(storage_root),
+    Root = wrfx_db:get_conf(storage_root),
     ok = filelib:ensure_dir(filename:join(Root, "touch")),
     {ok, Root}.
 
@@ -130,17 +130,6 @@ handle_cast(_Req, State) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-open_or_init_ets(R) ->
-    F = filename:join([R, "config", "nl.ets"]),
-    case filelib:is_regular(F) of
-	true ->
-	    {ok, Tab} = ets:file2tab(F);
-	false ->
-	    Tab = ets:new(wrfx_namelists, [set, protected])
-    end,
-    Tab.
-	
-
 move_or_copy(Src, Dst) ->
     case file:rename(Src, Dst) of
 	ok ->
@@ -152,9 +141,3 @@ move_or_copy(Src, Dst) ->
 	{error, R} ->
 	    {failure, R}
     end.
-
-
-store_ets_table({Tab, Root}) ->
-    Dst = filename:join([Root, "config", "nl.ets"]),
-    filelib:ensure_dir(Dst),
-    ets:tab2file(Tab, Dst).
