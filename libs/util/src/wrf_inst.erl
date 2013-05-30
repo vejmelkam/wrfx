@@ -1,9 +1,8 @@
 
-
 -module(wrf_inst).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -export([detect_build_target/1, detect_build_type/1]).
-
+-include_lib("flow/include/flow.hrl").
 
 detect_build_target(WRFRoot) ->
     FileList = [ "run/wrf.exe", "run/real.exe" ],
@@ -13,7 +12,7 @@ detect_build_target(WRFRoot) ->
     PID = plan_runner:execute_plan(P, [L]),
     case plan_runner:wait_for_plan(PID) of
 	success ->
-	    real_target
+	    real_target;
 	failure ->
 	    unknown_target
     end.
