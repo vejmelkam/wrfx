@@ -75,8 +75,7 @@ test_serial_job() ->
 
 test_mpi_job() ->
     
-%    NLSpec = wrf_reg:create_profile_from_reg(filename:join(WRFDir, "Registry"),
-%					     vanilla_wrf_v34),
+    wrfx:start(),
 
     From = {{2013, 5, 2}, {0, 0, 0}},
     To = {{2013, 5, 2}, {0, 30, 0}},
@@ -93,7 +92,8 @@ test_mpi_job() ->
 	    {grib_sources, [rnrs_nam218]},
 	    {mpi_exec_name, "/usr/mpi/gcc/openmpi-1.4.3/bin/mpiexec"},
 	    {mpi_nprocs, 12*4},
-	    {mpi_nodes, [ "node01", "node02", "node03", "node04" ]} ],
+	    {mpi_nodes, [ "node01", "node02", "node03", "node04" ]},
+	    {schedule, {0, 0, 0}}],
 
     run_job(Cfg).
 
