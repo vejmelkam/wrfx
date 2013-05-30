@@ -17,9 +17,9 @@
 file_exists(F) ->
     case filelib:is_regular(F) of
 	true ->
-	    {success, io_lib:format("file ~p exists.", [F])};
+	    {success, io_lib:format("file ~s exists", [F])};
 	false ->
-	    {failure, io_lib:format("file ~p does not exist.", [F])}
+	    {failure, io_lib:format("file ~s does not exist", [F])}
     end.
 
 
@@ -28,9 +28,9 @@ file_exists(F) ->
 dir_exists(D) ->
     case filelib:is_dir(D) of
 	true ->
-	    {success, io_lib:format("source directory ~p exists.", [D])};
+	    {success, io_lib:format("source directory ~s exists", [D])};
 	false ->
-	    {failure, check_dir_exists_task, io_lib:format("source directory ~p does not exist.", [D])}
+	    {failure, check_dir_exists_task, io_lib:format("source directory ~s does not exist", [D])}
     end.
 
 %% @doc Create a directory on the filesystem.
@@ -38,9 +38,9 @@ dir_exists(D) ->
 create_dir(D) ->
     case filelib:ensure_dir(filename:join(D, "test_file")) of
 	ok ->
-	    {success, io_lib:format("destination directory ~p created.", [D])};
+	    {success, io_lib:format("destination directory ~s created", [D])};
 	{error, E} ->
-	    {failure, io_lib:format("cannot create directory ~p, reported error [~p]~n", [D, E])}
+	    {failure, io_lib:format("cannot create directory ~s, reported error [~s]", [D, E])}
     end.
 
 
@@ -49,9 +49,9 @@ create_dir(D) ->
 create_symlink(F, L) ->
     case file:make_symlink(F, L) of
 	ok ->
-	    {success, io_lib:format("created symlink [~p] -> [~p].~n", [L, F])};
+	    {success, io_lib:format("created symlink [~s] -> [~s]", [L, F])};
 	{error, E} ->
-	    {failure, io_lib:format("failed to create symlink [~p] -> [~p] with error [~p].~n", [L, F, E])}
+	    {failure, io_lib:format("failed to create symlink [~s] -> [~s] with error [~p]", [L, F, E])}
     end.
 
 
@@ -60,9 +60,9 @@ create_symlink(F, L) ->
 write_file(F, C) ->
     case file:write_file(F, C) of
 	ok ->
-	    {success, io_lib:format("content written to [~p].~n", [F])};
+	    {success, io_lib:format("content written to [~s]", [F])};
 	{error, R} ->
-	    {failure, io_lib:format("could not write to [~p] with error [~p].~n", [F, R])}
+	    {failure, io_lib:format("could not write to [~s] with error [~p]", [F, R])}
     end.
 
 
@@ -71,9 +71,9 @@ write_file(F, C) ->
 delete_file(F) ->
     case file:delete(F) of
 	ok ->
-	    {success, io_lib:format("file [~p] deleted.~n", [F])};
+	    {success, io_lib:format("file [~s] deleted", [F])};
 	{error, enoent} ->
-	    {success, io_lib:format("file [~p] is non-existent, skipping.~n", [F])};
+	    {success, io_lib:format("file [~s] is non-existent, skipping", [F])};
 	{error, E} ->
-	    {failure, io_lib:format("error [~p] encountered while deleting file [~p]~n", [E, F])}
+	    {failure, io_lib:format("error [~s] encountered while deleting file [~p]", [E, F])}
     end.

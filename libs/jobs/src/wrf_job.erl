@@ -4,7 +4,39 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 
 -include_lib("flow/include/flow.hrl").
--export([run_job/1, test_serial_job/0, test_mpi_job/0, detect_wrf_real/1, detect_wrf_build/1]).
+-export([check_config/1, run_job/1, test_serial_job/0, test_mpi_job/0]).
+
+
+%% @doc
+%% Checks whether the configuration structure is valid for wrf_job and makes
+%% a best-effort check if this job will be executable.
+%% @spec check_config(C::plist()) -> true|{false, Error}
+%%
+check_config(C) ->
+
+    case plist:contains_keys([wrf_id, wps_id, wrf_exec_method,
+			      wps_nl_template_id, wrf_nl_template_id,
+			      grib_sources, schedule])
+    of
+	{false, Missing} ->
+	    {false, {missing_keys, Missing}};
+	true ->
+	    WrfId = plist:getp(wrf_id, C),
+	    {ok, WRFDir} = wrfx_cfg:get_conf(WrfId),
+	    BT = wrf_inst:detect_build_type(WRFDir),
+	    check_run_config(BT, C)
+    end.
+
+check_run_config(no_mpi, _C) ->
+    true;
+check_run_config(with_mpi, C) ->
+    case plist:contains_keys([mpi_exec_name, mpi_nprocs, mpi_nodes], C) of
+	true ->
+	    true;
+	{false, M} ->
+	    {false, {missing_keys, M}}
+    end.
+
 
 %% @doc
 %% It's still not clear how to generate and store complex plans (jobs).
@@ -22,31 +54,20 @@ test_serial_job() ->
 
     wrfx:start(),
     
-    {ok, WRFDir} = wrfx_cfg:get_conf(serial_wrf_34),
-    {ok, WPSDir} = wrfx_cfg:get_conf(serial_wps_34),
-    WPSTempl = nllist:parse(filename:join(WPSDir, "namelist.wps")),
-    WRFTempl = nllist:parse(filename:join(WRFDir, "run/namelist.input")),
-    Cfg1 = wrf_nl:read_config(WRFTempl),
-    {ok, Wrkspc} = wrfx_cfg:get_conf(workspace_root),
+%    {ok, WRFDir} = wrfx_cfg:get_conf(serial_wrf_34),
+%    {ok, WPSDir} = wrfx_cfg:get_conf(default_wps),
 
-    NLSpec = wrf_reg:create_profile_from_reg(filename:join(WRFDir, "Registry"),
-					     vanilla_wrf_v34),
-
-    Cfg = plist:update_with([ {wrf_install_dir, WRFDir},
-			      {wps_install_dir, WPSDir},
-			      {wrf_build_type, detect_wrf_build(WRFDir)},
-			      {wrf_exec_method, immediate},
-			      {job_name, "testjob0"},
-			      {workspace_dir, Wrkspc},
-			      {wps_nl_template, WPSTempl},
-			      {wrf_nl_template, WRFTempl},
-			      {nl_spec, NLSpec},
-			      {wrf_from, {{2013, 5, 1}, {0, 0, 0}}},
-			      {wrf_to, {{2013, 5, 1}, {0, 30, 0}}},
-			      {history_interval_min, 15},
-			      {grib_interval_seconds, 1800},
-			      {grib_sources, [rnrs_nam218]} ],
-			      Cfg1),
+    Cfg = [ {wrf_id, serial_wrf_34},
+	    {wps_id, default_wps},
+	    {wrf_build_type, no_mpi},
+	    {wrf_exec_method, immediate},
+	    {wps_nl_template_id, colorado_test_wps},
+	    {wrf_nl_template_id, colorado_test_wrf},
+	    {wrf_from, {{2013, 5, 1}, {0, 0, 0}}},
+	    {wrf_to, {{2013, 5, 1}, {0, 30, 0}}},
+	    {history_interval_min, 15},
+	    {grib_sources, [rnrs_nam218]},
+	    {schedule, {23, 0, 0}}],
 
     run_job(Cfg).
 
@@ -54,78 +75,104 @@ test_serial_job() ->
 
 test_mpi_job() ->
     
-    {ok, WRFDir} = wrfx_cfg:get_conf(default_wrf),
-    {ok, WPSDir} = wrfx_cfg:get_conf(default_wps),
-    {ok, WorkspaceRoot} = wrfx_cfg:get_conf(workspace_root),
-    WPSTempl = nllist:parse(filename:join(WPSDir, "namelist.wps")),
-    WRFTempl = nllist:parse(filename:join(WRFDir, "run/namelist.input")),
-    Cfg1 = wrf_nl:read_config(WRFTempl),
-
-    NLSpec = wrf_reg:create_profile_from_reg(filename:join(WRFDir, "Registry"),
-					     vanilla_wrf_v34),
+%    NLSpec = wrf_reg:create_profile_from_reg(filename:join(WRFDir, "Registry"),
+%					     vanilla_wrf_v34),
 
     From = {{2013, 5, 2}, {0, 0, 0}},
     To = {{2013, 5, 2}, {0, 30, 0}},
 
-    Cfg = plist:update_with([ {wrf_install_dir, WRFDir},
-			      {wps_install_dir, WPSDir},
-			      {wrf_build_type, detect_wrf_build(WRFDir)},
-			      {wrf_exec_method, immediate},
-			      {job_name, "testjob-mpi-0"},
-			      {workspace_dir, WorkspaceRoot},
-			      {wps_nl_template, WPSTempl},
-			      {wrf_nl_template, WRFTempl},
-			      {nl_spec, NLSpec},
-			      {wrf_from, From},
-			      {wrf_to, To},
-			      {history_interval_min, 15},
-			      {grib_interval_seconds, atime:dt_time_diff(From, To)},
-			      {grib_sources, [rnrs_nam218]},
-			      {mpi_exec_name, "/usr/mpi/gcc/openmpi-1.4.3/bin/mpiexec"},
-			      {mpi_nprocs, 12*4},
-			      {mpi_nodes, [ "node01", "node02", "node03", "node04" ]} ],
-			      Cfg1),
+    Cfg = [ {wrf_id, serial_wrf_34},
+	    {wps_id, default_wps},
+	    {wrf_build_type, with_mpi},
+	    {wrf_exec_method, immediate},
+	    {wps_nl_template_id, colorado_test_wps},
+	    {wrf_nl_template_id, colorado_test_wrf},
+	    {wrf_from, From},
+	    {wrf_to, To},
+	    {history_interval_min, 15},
+	    {grib_sources, [rnrs_nam218]},
+	    {mpi_exec_name, "/usr/mpi/gcc/openmpi-1.4.3/bin/mpiexec"},
+	    {mpi_nprocs, 12*4},
+	    {mpi_nodes, [ "node01", "node02", "node03", "node04" ]} ],
 
     run_job(Cfg).
 
 
-run_job(Cfg) ->
+run_job(CfgOverw) ->
 
-    % FIXME: this is very basic, retrieve_grib_files needs to go into the retr module
+    % read the namelist configuration from Cfg1 and update what is necessary from Cfg2
+    {ok, WRFTempl} = wrfx_stor:namelist_retrieve(plist:getp(wrf_nl_template_id, CfgOverw)),
+    CfgNl = wrf_nl:read_config(WRFTempl),
+    Cfg = plist:update_with(CfgOverw, CfgNl),
+
+    % retrieve the scheduled time and construct the nominal run time
+    T = plist:getp(schedule, Cfg),
+    {Date, _} = calendar:universal_time(),
+    DT = {Date, T},
+
+    % retrieve start and end times which are specified relative to schedule or absolutely 
+    case plist:contains(start_delta_hr, Cfg) of
+	{true, _} ->
+	    From = atime:dt_shift_hours(DT, plist:getp(start_delta_hr, Cfg)),
+	    To = atime:dt_shift_hours(DT, plist:getp(stop_delta_hr, Cfg));
+	false ->
+	    From = plist:getp(wrf_from, Cfg),
+	    To = plist:getp(wrf_to, Cfg)
+    end,
+
+    % retrieve the installation directories
+    {ok, WRFInstDir} = wrfx_cfg:get_conf(plist:getp(wrf_id, Cfg)),
+    {ok, WPSInstDir} = wrfx_cfg:get_conf(plist:getp(wps_id, Cfg)),
+
+    % build a namelist specification from the registry in wrf dir
+    NLSpec = wrf_reg:create_profile_from_reg(filename:join(WRFInstDir, "Registry"),
+					     vanilla_wrf_v34),
+
+    % construct job name using From
+    JN = io_lib:format("wrf_job_~s", [esmf:time_to_string(From)]),
+
+    % retrieve GRIB files
     R = lists:nth(1, plist:getp(grib_sources, Cfg)),
-    {{WPSFrom, WPSTo}, VtableFile, GribFiles} = retrieve_grib_files(R, plist:getp(wrf_from, Cfg), plist:getp(wrf_to, Cfg)),
+    {{WPSFrom, WPSTo}, VtableFile, GribFiles} = retrieve_grib_files(R, From, To),
 
     % construct temporary workspaces from job name
-    JN = plist:getp(job_name, Cfg),
-    WPSExecDir = filename:join(plist:getp(workspace_dir, Cfg), "wps_" ++ JN),
-    WRFExecDir = filename:join(plist:getp(workspace_dir, Cfg), "wrf_" ++ JN),
+    {ok, Wkspace} = wrfx_cfg:get_conf(workspace_root),
+    WPSExecDir = filename:join(Wkspace, "wps_" ++ JN),
+    WRFExecDir = filename:join(Wkspace, "wrf_" ++ JN),
 
     % ensure these workspaces are empty
     filesys:remove_directory(WPSExecDir),
     filesys:remove_directory(WRFExecDir),
 
-    % given the limits in the GRIB files, update the configuration
+    % update cfg with wps: GRIB file time limits, vtable file to use and wrf: from-to range
     Cfg2 = plist:update_with([{grib_files, GribFiles},
+			      {wrf_from, From},
+			      {wrf_to, To},
 			      {wps_from, WPSFrom},
 			      {wps_to, WPSTo},
 			      {vtable_file, VtableFile},
 			      {wps_exec_dir, WPSExecDir},
-			      {wrf_exec_dir, WRFExecDir}], Cfg),
+			      {wrf_exec_dir, WRFExecDir},
+			      {wps_install_dir, WPSInstDir},
+			      {wrf_install_dir, WRFInstDir},
+			      {job_name, JN},
+			      {grib_interval_seconds, atime:dt_time_diff(From, To)},
+			      {nl_spec, NLSpec}], Cfg),
 
     % construct WRF and WPS namelists
     Cfg3 = make_namelists(Cfg2),
 
     % plan & execute WPS job
     Plan = plan_wps_exec:make_exec_plan(Cfg3),
-    io:format("wps_exec plan has ~p steps.~n", [plan:count_steps(Plan)]),
 
-    PID = plan_runner:execute_plan(Plan),
+    L = plan_logger:start(stdio),
+    L2 = plan_logger:start("/tmp/wps_exec_plan.log"),
+    PID = plan_runner:execute_plan(Plan, [L, L2]),
     case plan_runner:wait_for_plan(PID) of
-     	{success, _Log} ->
+     	success ->
      	    prep_wrf(Cfg3);
-	{failure, _MFA, Text, _R, _Log} ->
-	    io:format("error during plan execution [~p]~n", [lists:flatten(Text)]),
-	    {failure, Text}
+	failure ->
+	    failure
     end.
 
 
@@ -139,13 +186,13 @@ prep_wrf(Cfg) ->
     ExecM = plist:getp(wrf_exec_method, Cfg),
     BuildT = plist:getp(wrf_build_type, Cfg),
     
-    PID = plan_runner:execute_plan(Plan),
+    L = plan_logger:start(stdio),
+    PID = plan_runner:execute_plan(Plan, [L]),
     case plan_runner:wait_for_plan(PID) of
-	{success, _Log} ->
+	success ->
 	    run_wrf(ExecM, BuildT, Cfg);
-	{failure, _MFA, Text, _R, _Log} ->
-	    io:format("error during plan execution [~p]~n", [lists:flatten(Text)]),
-	    {failure, Text}
+	failure ->
+	    failure
     end.
 
 
@@ -186,9 +233,8 @@ run_wrf(immediate, with_mpi, Cfg) ->
     end.
 
 
-
+%% @TODO: this step should be converted into a plan as well
 post_wrf(Cfg) ->
-    JN = plist:getp(job_name, Cfg),
     WPSDir = plist:getp(wps_exec_dir, Cfg),
     WRFDir = plist:getp(wrf_exec_dir, Cfg),
     WPSL = [ "geogrid.output", "ungrib.output", "metgrid.output",
@@ -196,7 +242,7 @@ post_wrf(Cfg) ->
 	     "namelist.wps" ],
     WRFL = [ "namelist.input", "real.output", "wrf.output" ],
 
-    Dom = "outputs/" ++ JN,
+    Dom = "outputs/" ++ plist:getp(job_name, Cfg),
 
     % store all fixed files
     lists:map(fun (X) -> wrfx_stor:file_store({Dom, X}, filename:join(WPSDir, X)) end, WPSL),
@@ -209,12 +255,15 @@ post_wrf(Cfg) ->
     % clean out and remove directories
     filesys:remove_directory(plist:getp(wps_exec_dir, Cfg)),
     filesys:remove_directory(plist:getp(wrf_exec_dir, Cfg)),
+
     success.
 
 
 make_namelists(Cfg) ->
-    WPSNL = wps_nl:write_config(Cfg, plist:getp(wps_nl_template, Cfg)),
-    WRFNL = wrf_nl:write_config(Cfg, plist:getp(wrf_nl_template, Cfg)),
+    {ok, WPST} = wrfx_stor:namelist_retrieve(plist:getp(wps_nl_template_id, Cfg)),
+    {ok, WRFT} = wrfx_stor:namelist_retrieve(plist:getp(wrf_nl_template_id, Cfg)),
+    WPSNL = wps_nl:write_config(Cfg, WPST),
+    WRFNL = wrf_nl:write_config(Cfg, WRFT),
     plist:update_with([ {wps_nl, WPSNL}, {wrf_nl, WRFNL} ], Cfg).
 
 
@@ -241,31 +290,3 @@ retrieve_grib_files(Dom, URLBase, [Name|Names], List) ->
 
     
 
-detect_wrf_real(WRFRoot) ->
-    FileList = [ "run/wrf.exe", "run/real.exe" ],
-    P = #plan{id = check_wrf_installation,
-	      tasks = [ {filesys_tasks, file_exists, [ filename:join(WRFRoot, F) ] } || F <- FileList ]},
-    PID = plan_runner:execute_plan(P),
-    case plan_runner:wait_for_plan(PID) of
-	{success,_} ->
-	    have_wrf_real;
-	_ ->
-	    no_wrf_real
-    end.
-
-
-detect_wrf_build(WRFRoot) ->
-    WRFRunDir = filename:join(WRFRoot, "run"),
-    Cmd = io_lib:format("nm ~p/wrf.exe", [WRFRunDir]),
-    Output = os:cmd(Cmd),
-    case string:str(Output, "wrf") of
-	0 ->
-	    failed;
-	_ ->
-	    case string:str(Output, "mpi_finalize") of
-		0 ->
-		    no_mpi;
-		_ ->
-		    with_mpi
-	    end
-    end.

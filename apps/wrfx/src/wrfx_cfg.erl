@@ -11,6 +11,7 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -behavior(gen_server).
 -define(SERVER, ?MODULE).
+-define(CFG_FILE, ".wrfxcfg").
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -46,16 +47,16 @@ get_conf(Key) ->
 
 init(_Args) ->
     {ok, [[H]]} = init:get_argument(home),
-    C = filename:join(H, ".wrfxcfg"),
+    C = filename:join(H, ?CFG_FILE),
     {ok, init_state(C)}.
 
 
-handle_call({get_conf, Key}, _From, C) ->
-    case plist:contains(Key, C) of
-	true ->
-	    {reply, {ok, plist:getp(Key, C)}, C};
+handle_call({get_conf, Key}, _From, List) ->
+    case plist:contains(Key, List) of
+	{true, V} ->
+	    {reply, {ok, V}, List};
 	false ->
-	    {reply, {error, not_found}, C}
+	    {reply, {error, not_found}, List}
     end;
 
 handle_call(terminate, _From, _State) ->
@@ -89,7 +90,9 @@ init_state(C) ->
 	true ->
 	    load_terms(C);
 	false ->
-	    default_state()
+	    S = default_state(),
+	    plist:store(C, S),
+	    S
     end.
 
 

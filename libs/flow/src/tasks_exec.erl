@@ -69,15 +69,15 @@ wait_for_completion(XPID) ->
 
 
 evaluate_result(exit_code, 0, _F, Cmd) ->
-    {success, io_lib:format("success executing ~s~n", [Cmd])};
+    {success, io_lib:format("success executing ~s", [Cmd])};
 evaluate_result(exit_code, C, _F, Cmd) ->
-    {failure, io_lib:format("execution of ~s failed with exit code ~s~n", [Cmd, C])};
+    {failure, io_lib:format("execution of ~s failed with exit code ~s", [Cmd, C])};
 evaluate_result({scan_for, S}, C, F, Cmd) ->
     case scan_file(S, F) of
 	found ->
-	    {success, io_lib:format("command [~s] completed succesfully with exit code ~p.~n", [Cmd, C])};
+	    {success, io_lib:format("command [~s] completed succesfully with exit code ~p", [Cmd, C])};
 	not_found ->
-	    {failure, io_lib:format("string [~s] was not found in the output of [~s], exit_code is [~p]~n", [S, Cmd, C])}
+	    {failure, io_lib:format("string [~s] was not found in the output of [~s], exit_code is [~p]", [S, Cmd, C])}
     end.
 
 

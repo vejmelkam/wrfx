@@ -82,7 +82,6 @@ handle_call({file_store, {Dom, Name}, F}, _From, S={_Tab, Root}) ->
 	    {reply, {failure, E}, S}
     end;
 
-
 handle_call({file_remove, {Dom, Name}}, _From, S={_Tab, Root}) ->
     F = filename:join([Root, Dom, Name]),
     case file:delete(F) of
@@ -105,6 +104,22 @@ handle_call({file_exists, {Dom, Name}}, _From, S={_Tab,Root}) ->
 	    {reply, false, S}
     end;
 
+handle_call({nl_store, ID, NL}, _From, S={Tab, _R}) ->
+    ets:insert(Tab, {ID, NL}),
+    store_ets_table(S),
+    {reply, success, S};
+
+handle_call({nl_retrieve, ID}, _From, S={Tab, _R}) ->
+    case ets:lookup(Tab, ID) of
+	[{ID, NL}] ->
+	    {reply, {ok, NL}, S};
+	_ ->
+	    {reply, not_found, S}
+    end;
+
+handle_call(nl_list, _From, S={Tab, _R}) ->
+    Lst = ets:foldl(fun ({ID, _NL}, A) -> [ID|A] end, [], Tab),
+    {reply, Lst, S};
 
 handle_call(terminate, _From, _State) ->
     {stop, normal, ok, no_storage}.
@@ -132,16 +147,15 @@ handle_cast(_Req, State) ->
 %% ------------------------------------------------------------------
 
 open_or_init_ets(R) ->
-    F = filename:join(R, ".wrfx.db"),
+    F = filename:join([R, "config", "nl.ets"]),
     case filelib:is_regular(F) of
 	true ->
 	    {ok, Tab} = ets:file2tab(F);
 	false ->
-	    Tab = ets:new(wrfx_namelists, [])
+	    Tab = ets:new(wrfx_namelists, [set, protected])
     end,
     Tab.
 	
-
 
 move_or_copy(Src, Dst) ->
     case file:rename(Src, Dst) of
@@ -155,3 +169,8 @@ move_or_copy(Src, Dst) ->
 	    {failure, R}
     end.
 
+
+store_ets_table({Tab, Root}) ->
+    Dst = filename:join([Root, "config", "nl.ets"]),
+    filelib:ensure_dir(Dst),
+    ets:tab2file(Tab, Dst).

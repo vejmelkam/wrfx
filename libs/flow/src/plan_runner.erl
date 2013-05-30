@@ -9,7 +9,7 @@
 
 -module(plan_runner).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([execute_plan/1, ping_planner/1, wait_for_plan/1]).
+-export([execute_plan/2, ping_planner/1, wait_for_plan/1]).
 -include("include/flow.hrl").
 
 -ifdef(TEST).
@@ -39,34 +39,37 @@ wait_for_plan(PID) ->
     
 
 %% @doc Executes a plan asynchronously, returns immediately with
-%%      the pid of the running plan.
-%% @spec execute_plan(plan()) -> pid()
-execute_plan(#plan{tasks=T}) ->
+%%      the pid of the running plan.  Sends messages about plan progress to
+%%      monitors in list M.
+%% @spec execute_plan(plan(), [pid()]) -> pid()
+execute_plan(#plan{tasks=T}, Monitors) ->
     S = self(),
-    spawn(fun () -> S ! {plan_complete, self(), execute_plan(T, [])} end).
+    spawn(fun () -> S ! {plan_complete, self(), execute_plan_internal(T, Monitors)} end).
 
 
-execute_plan([], Log) ->
-    {success, lists:reverse(Log)};
-execute_plan([MFA={M,F,A}|Rest], Log) ->
+execute_plan_internal([], Monitors) ->
+    msg_router:multicast({self(), success}, Monitors),
+    success;
+execute_plan_internal([MFA={M,F,A}|Rest], Monitors) ->
     S = self(),
     PID = spawn(fun () -> S ! {async_task_done, self(), apply(M, F, A)} end),
-    wait_for_result(PID, MFA, Rest, Log).
+    wait_and_check_messages(PID, MFA, Rest, Monitors).
 
 
-wait_for_result(PID, MFA, Rest, Log) ->
+wait_and_check_messages(PID, MFA, Rest, Monitors) ->
     receive
 	{async_task_done, PID, {success, Text}} ->
-	    execute_plan(Rest, [Text|Log]);
-	{async_task_done, PID, {failure, Text}} ->
-	    {failure, MFA, Text, Rest, lists:reverse(Log)};
+	    msg_router:multicast({self(), task_done, MFA, Text}, Monitors),
+	    execute_plan_internal(Rest, Monitors);
+	{async_task_done, PID, {failure, Error}} ->
+	    msg_router:multicast({self(), failure, MFA, Error}, Monitors),
+	    failure;
 	{ping, From} ->
 	    From ! {pong, self()},
-	    wait_for_result(PID, MFA, Rest, Log);
+	    wait_and_check_messages(PID, MFA, Rest, Monitors);
 	BadMsg ->
 	    io:format("Unexpected message [~p]~n", [BadMsg])
     end.
-
 
 
 -ifdef(TEST).

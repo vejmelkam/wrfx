@@ -9,9 +9,9 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 
 -export([new/0, keys/1, props/1, 
-	 setp/3, getp/2, getp/3, get_list/2, contains/2,
+	 setp/3, getp/2, getp/3, get_list/2, contains/2, contains_keys/2,
 	 update_with/2, update_with/3,
-	 store/2]).
+	 store/2, load/1]).
 
 
 -ifdef(TEST).
@@ -60,10 +60,24 @@ get_list(Ks, P) ->
 
 contains(_K, []) ->
     false;
-contains(K, [{K,_V}|_P]) ->
-    true;
+contains(K, [{K,V}|_P]) ->
+    {true, V};
 contains(K, [_E|P]) ->
     contains(K, P).
+
+contains_keys(Ks, P) ->
+    contains_keys(Ks, P, []).
+contains_keys([], _P, []) ->
+    true;
+contains_keys([], _P, Missing) ->
+    {false, Missing};
+contains_keys([K|Ks], P, Missing) ->
+    case contains(K, P) of
+	true ->
+	    contains_keys(Ks, P, Missing);
+	false ->
+	    contains_keys(Ks, P, [K|Missing])
+    end.
 
 
 update_with(UP, P) ->
@@ -74,7 +88,13 @@ update_with(KL, VL, P) ->
 
 
 store(F, P) ->
-    file:write_file(F, P).
+    {ok, D} = file:open(F, [write]),
+    lists:map(fun (X) -> file:write(D, io_lib:fwrite("~p.~n", [X])) end, P),
+    file:close(D).
+
+load(F) ->
+    {ok, C} = file:consult(F),
+    C.
 
 
 -ifdef(TEST).

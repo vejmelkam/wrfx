@@ -27,6 +27,5 @@ init([]) ->
     {ok, { {one_for_one, 5, 10}, [
 				 ?CHILD(wrfx_cfg, worker),
 				 ?CHILD(wrfx_stor, worker),
-				 ?CHILD(wrfx_sched, worker),
 				 ?CHILD(wrfx, worker)
 				 ]} }.
