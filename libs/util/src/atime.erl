@@ -1,16 +1,17 @@
 
 
-%
-%  Atime is a module for date and time arithmetic.
-%
+%% @doc
+%% Atime is a module for date and time arithmetic
+%% and conversion to string.
+%%
 
 -module(atime).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([dt_shift_hours/2, dt_shift_days/2, d_shift_days/2, 
-	 dt_hours_since/2,
-	 dt_round_hours/2,
-	 dt_time_diff/2,
-	 is_before/2, is_after/2, compare/2]).
+-export([dt_shift_hours/2, dt_shift_days/2, d_shift_days/2]).
+-export([dt_hours_since/2, dt_time_diff/2]).
+-export([dt_round_hours/2]).
+-export([is_before/2, is_after/2, compare/2]).
+-export([dt_mdhm_str/1]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -67,6 +68,10 @@ compare(DT1, DT2) ->
 		    same
 	    end
     end.
+
+
+dt_mdhm_str({{_Y,M,D}, {H,Min,_S}}) ->
+    lists:flatten(io_lib:format("~2..0B-~2..0B_~2..0B:~2..0B", [M, D, H, Min])).
 
 
 -ifdef(TEST).

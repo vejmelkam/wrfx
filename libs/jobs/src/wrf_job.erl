@@ -77,18 +77,19 @@ test_mpi_job() ->
     
     wrfx:start(),
 
-    From = {{2013, 5, 2}, {0, 0, 0}},
-    To = {{2013, 5, 2}, {0, 30, 0}},
+%    From = {{2013, 5, 2}, {0, 0, 0}},
+%    To = {{2013, 5, 2}, {0, 30, 0}},
 
-    Cfg = [ {wrf_id, serial_wrf_34},
+    Cfg = [ {wrf_id, parallel_wrf_34},
 	    {wps_id, default_wps},
-	    {wrf_build_type, with_mpi},
 	    {wrf_exec_method, immediate},
 	    {wps_nl_template_id, colorado_test_wps},
 	    {wrf_nl_template_id, colorado_test_wrf},
-	    {wrf_from, From},
-	    {wrf_to, To},
-	    {history_interval_min, 15},
+%	    {wrf_from, From},
+%	    {wrf_to, To},
+	    {from_delta_hr, -24},
+	    {to_delta_hr, 24},
+	    {history_interval_min, 30},
 	    {grib_sources, [rnrs_nam218]},
 	    {mpi_exec_name, "/usr/mpi/gcc/openmpi-1.4.3/bin/mpiexec"},
 	    {mpi_nprocs, 12*4},
@@ -111,10 +112,10 @@ run_job(CfgOverw) ->
     DT = {Date, T},
 
     % retrieve start and end times which are specified relative to schedule or absolutely 
-    case plist:contains(start_delta_hr, Cfg) of
+    case plist:contains(from_delta_hr, Cfg) of
 	{true, _} ->
-	    From = atime:dt_shift_hours(DT, plist:getp(start_delta_hr, Cfg)),
-	    To = atime:dt_shift_hours(DT, plist:getp(stop_delta_hr, Cfg));
+	    From = atime:dt_shift_hours(DT, plist:getp(from_delta_hr, Cfg)),
+	    To = atime:dt_shift_hours(DT, plist:getp(to_delta_hr, Cfg));
 	false ->
 	    From = plist:getp(wrf_from, Cfg),
 	    To = plist:getp(wrf_to, Cfg)
@@ -137,8 +138,8 @@ run_job(CfgOverw) ->
 
     % construct temporary workspaces from job name
     {ok, Wkspace} = wrfx_cfg:get_conf(workspace_root),
-    WPSExecDir = filename:join(Wkspace, "wps_" ++ JN),
-    WRFExecDir = filename:join(Wkspace, "wrf_" ++ JN),
+    WPSExecDir = filename:join(Wkspace, "wps_exec_dir_for_" ++ JN),
+    WRFExecDir = filename:join(Wkspace, "wrf_exec_dir_for" ++ JN),
 
     % ensure these workspaces are empty
     filesys:remove_directory(WPSExecDir),
@@ -146,6 +147,7 @@ run_job(CfgOverw) ->
 
     % update cfg with wps: GRIB file time limits, vtable file to use and wrf: from-to range
     Cfg2 = plist:update_with([{grib_files, GribFiles},
+			      {wrf_build_type, wrf_inst:detect_build_type(WRFInstDir)},
 			      {wrf_from, From},
 			      {wrf_to, To},
 			      {wps_from, WPSFrom},
@@ -180,7 +182,6 @@ prep_wrf(Cfg) ->
 
     % Make an execution plan and run it (this does everything except submitting the wrf_job
     Plan = plan_wrf_prep:make_exec_plan(Cfg),
-    io:format("wrf_prep plan has ~p steps.~n", [plan:count_steps(Plan)]),
 
     % Find execution method to use
     ExecM = plist:getp(wrf_exec_method, Cfg),
@@ -215,12 +216,13 @@ run_wrf(immediate, with_mpi, Cfg) ->
     Dir = plist:getp(wrf_exec_dir, Cfg),
     Machines = plist:getp(mpi_nodes, Cfg),
     NP = integer_to_list(plist:getp(mpi_nprocs, Cfg)),
+    MPI = plist:getp(mpi_exec_name, Cfg),
 
     % write a machinefile into the wrf directory
     file:write_file(filename:join(Dir, "node_list"), string:join(Machines, "\n")),
 
     % execute the mpiexec/mpirun command as per configuration
-    R = tasks_exec:execute(plist:getp(mpi_exec_name, Cfg),
+    R = tasks_exec:execute(MPI,
 			   [{in_dir, Dir}, {output_type, filename:join(Dir, "rsl.error.0000")},
 			    {exit_check, {scan_for, "SUCCESS"}},
 			    {op_args, [{args, ["--machinefile", "node_list", "-n", NP, "./wrf.exe"]}]},

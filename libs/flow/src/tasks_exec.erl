@@ -48,7 +48,7 @@ execute_capture_file(Cmd, InDir, Monitors, CaptureFile, StoreFile, ExtraOP, Exit
     FM = file_monitor:start(CaptureFile, Monitors),
 
     % run the external command and monitor execution until done
-    XPID = exproc:run(Cmd, [{cd, InDir}|ExtraOP], []),
+    XPID = exproc:run_and_monitor(Cmd, [{cd, InDir}|ExtraOP], []),
     C = wait_for_completion(XPID),
 
     % close the file monitor

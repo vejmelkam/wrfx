@@ -22,6 +22,8 @@ logger_msg_loop(Dev) ->
 	    logger_msg_loop(Dev);
 	{_PID, failure, MFA, Text} ->
 	    log_message(Dev, failure, MFA, Text),
+	    % note: closing a non-file device just returns an error,
+	    % so this call is safe even with Dev = stdio.
 	    file:close(Dev);
 	{_PID, success} ->
 	    log_message(Dev, plan_complete, [], []),
@@ -30,11 +32,13 @@ logger_msg_loop(Dev) ->
 
 		   
 log_message(D, task_done, _MFA, Text) ->
-    log_string(D, io_lib:format("Task complete: ~s.~n", [lists:flatten(Text)]));
+    T = atime:dt_mdhm_str(calendar:local_time()),
+    log_string(D, io_lib:format("Task complete [~s]: ~s.~n", [T, lists:flatten(Text)]));
 log_message(D, failure, {M, F, _A}, Text) ->
     log_string(D, io_lib:format("Plan execution failed at task ~p:~p with error ~s.~n", [M, F, lists:flatten(Text)]));
 log_message(D, plan_complete, [], []) ->
-    log_string(D, "Plan executed successfully.~n").
+    T = atime:dt_mdhm_str(calendar:local_time()),
+    log_string(D, io_lib:format("Plan executed successfully at [~s].~n", [T])).
 
 log_string(stdio, S) ->
     io:format(S);
