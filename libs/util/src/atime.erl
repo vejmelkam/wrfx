@@ -8,7 +8,7 @@
 -module(atime).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -export([dt_shift_hours/2, dt_shift_days/2, d_shift_days/2]).
--export([dt_hours_since/2, dt_time_diff/2]).
+-export([dt_hours_since/2, dt_seconds_between/2]).
 -export([dt_round_hours/2]).
 -export([is_before/2, is_after/2, compare/2]).
 -export([dt_mdhm_str/1]).
@@ -26,7 +26,7 @@ dt_round_hours(DT, up) ->
     dt_shift_hours(dt_round_hours(DT, down), 1).
 
 
-dt_time_diff(From, To) ->
+dt_seconds_between(From, To) ->
     ToS = calendar:datetime_to_gregorian_seconds(To),
     FromS = calendar:datetime_to_gregorian_seconds(From),
     ToS - FromS.

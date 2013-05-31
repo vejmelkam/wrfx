@@ -114,7 +114,7 @@ execute(CfgOverw) ->
 			      {wps_install_dir, WPSInstDir},
 			      {wrf_install_dir, WRFInstDir},
 			      {job_name, JN},
-			      {grib_interval_seconds, atime:dt_time_diff(From, To)},
+			      {grib_interval_seconds, atime:dt_seconds_between(WPSFrom, WPSTo)},
 			      {nl_spec, NLSpec}], Cfg),
 
     % construct WRF and WPS namelists
@@ -127,10 +127,10 @@ execute(CfgOverw) ->
     L2 = plan_logger:start("/tmp/wps_exec_plan.log"),
     PID = plan_runner:execute_plan(Plan, [L, L2]),
     case plan_runner:wait_for_plan(PID) of
-     	success ->
+     	{success, _} ->
      	    prep_wrf(Cfg3);
-	failure ->
-	    failure
+	R ->
+	    R
     end.
 
 
@@ -218,8 +218,8 @@ post_wrf(Cfg) ->
 
 
 make_namelists(Cfg) ->
-    {ok, WPST} = wrfx_db:lookup({nllist, plist:getp(wps_nl_template_id, Cfg)}),
-    {ok, WRFT} = wrfx_db:lookup({nllist, plist:getp(wrf_nl_template_id, Cfg)}),
+    {success, WPST} = wrfx_db:lookup({nllist, plist:getp(wps_nl_template_id, Cfg)}),
+    {success, WRFT} = wrfx_db:lookup({nllist, plist:getp(wrf_nl_template_id, Cfg)}),
     WPSNL = wps_nl:write_config(Cfg, WPST),
     WRFNL = wrf_nl:write_config(Cfg, WRFT),
     plist:update_with([ {wps_nl, WPSNL}, {wrf_nl, WRFNL} ], Cfg).
