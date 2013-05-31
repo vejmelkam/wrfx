@@ -23,7 +23,6 @@ namelists(#nllist{nls=NLS}) ->
     plist:keys(NLS).
 
 namelist(Id, #nllist{nls=NLs}) ->
-    io:format("retrieving ~p from ~p", [Id, NLs]),
     plist:getp(Id, NLs).
 
 set_namelist(Id, NL, NLF=#nllist{nls=NLS}) ->

@@ -58,12 +58,13 @@ execute(CfgOverw) ->
     Cfg = plist:update_with(CfgOverw, CfgNl),
 
     % retrieve the scheduled time and construct the nominal run time
-    case plist:getp(schedule, Cfg) of
-	now ->
-	    {_, T} = calendar:universal_time();
-	T ->
-	    T
-    end,
+    T = case plist:getp(schedule, Cfg) of
+	    now ->
+		{_, {Hr, _M, _S}} = calendar:universal_time(),
+		{Hr, 0, 0};
+	    {Hr, _M, _S} ->
+		{Hr, 0, 0}
+	end,
     {Date, _} = calendar:universal_time(),
     DT = {Date, T},
 
@@ -89,13 +90,13 @@ execute(CfgOverw) ->
     JN = io_lib:format("wrf_job_~s", [esmf:time_to_string(From)]),
 
     % retrieve GRIB files
-    R = lists:nth(1, plist:getp(grib_sources, Cfg)),
-    {{WPSFrom, WPSTo}, VtableFile, GribFiles} = retrieve_grib_files(R, From, To),
+    GribSrc = lists:nth(1, plist:getp(grib_sources, Cfg)),
+    {{CovFrom, CovTo}, VtableFile, GribFiles} = retrieve_grib_files(GribSrc, From, To),
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),
     WPSExecDir = filename:join(Wkspace, "wps_exec_dir_for_" ++ JN),
-    WRFExecDir = filename:join(Wkspace, "wrf_exec_dir_for" ++ JN),
+    WRFExecDir = filename:join(Wkspace, "wrf_exec_dir_for_" ++ JN),
 
     % ensure these workspaces are empty
     filesys:remove_directory(WPSExecDir),
@@ -106,15 +107,14 @@ execute(CfgOverw) ->
 			      {wrf_build_type, wrf_inst:detect_build_type(WRFInstDir)},
 			      {wrf_from, From},
 			      {wrf_to, To},
-			      {wps_from, WPSFrom},
-			      {wps_to, WPSTo},
+			      {wps_from, CovFrom},
+			      {wps_to, CovTo},
 			      {vtable_file, VtableFile},
 			      {wps_exec_dir, WPSExecDir},
 			      {wrf_exec_dir, WRFExecDir},
 			      {wps_install_dir, WPSInstDir},
 			      {wrf_install_dir, WRFInstDir},
 			      {job_name, JN},
-			      {grib_interval_seconds, atime:dt_seconds_between(WPSFrom, WPSTo)},
 			      {nl_spec, NLSpec}], Cfg),
 
     % construct WRF and WPS namelists
@@ -146,10 +146,10 @@ prep_wrf(Cfg) ->
     L = plan_logger:start(stdio),
     PID = plan_runner:execute_plan(Plan, [L]),
     case plan_runner:wait_for_plan(PID) of
-	success ->
+	{success,_} ->
 	    run_wrf(ExecM, BuildT, Cfg);
-	failure ->
-	    failure
+	R ->
+	    R
     end.
 
 
@@ -220,6 +220,7 @@ post_wrf(Cfg) ->
 make_namelists(Cfg) ->
     {success, WPST} = wrfx_db:lookup({nllist, plist:getp(wps_nl_template_id, Cfg)}),
     {success, WRFT} = wrfx_db:lookup({nllist, plist:getp(wrf_nl_template_id, Cfg)}),
+    io:format("~p~n", [nllist:namelists(WPST)]),
     WPSNL = wps_nl:write_config(Cfg, WPST),
     WRFNL = wrf_nl:write_config(Cfg, WRFT),
     plist:update_with([ {wps_nl, WPSNL}, {wrf_nl, WRFNL} ], Cfg).
@@ -245,6 +246,3 @@ retrieve_grib_files(Dom, URLBase, [Name|Names], List) ->
 	{true, F} ->
 	    retrieve_grib_files(Dom, URLBase, Names, [F|List])
     end.
-
-    
-

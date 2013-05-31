@@ -34,7 +34,7 @@ url_prefix() ->
 manifest(From, To, Delta) ->
 
     % estimate the latest cycle that was run and is available online
-    UTCNow_3 = atime:dt_shift_hours(calendar:universal_time(), -2),
+    UTCNow_3 = atime:dt_shift_hours(calendar:universal_time(), -3),
     LatestCycle = get_cycle_time(UTCNow_3, Delta),
 
     % adjust from and to to be aligned on the hour (first adjustment step)
