@@ -48,8 +48,13 @@ lookup(R) ->
 
 lookup(R,N) when N > 1 ->
     try
-	[V] = mnesia:dirty_read({element(1, R), element(N, R)}),
-	{success, V}
+	Res = mnesia:dirty_read({element(1, R), element(N, R)}),
+	case Res of
+	    [V] ->
+		{success, V};
+	    [] ->
+		{failure, not_found}
+	end
     catch
 	{'EXIT', {aborted, R}} ->
 	    {failure, R}

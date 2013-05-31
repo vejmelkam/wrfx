@@ -49,7 +49,7 @@ execute_plan(#plan{tasks=T}, Monitors) ->
 
 execute_plan_internal([], Monitors) ->
     msg_router:multicast({self(), success}, Monitors),
-    success;
+    {success, []};
 execute_plan_internal([MFA={M,F,A}|Rest], Monitors) ->
     S = self(),
     PID = spawn(fun () -> S ! {async_task_done, self(), apply(M, F, A)} end),
@@ -63,7 +63,7 @@ wait_and_check_messages(PID, MFA, Rest, Monitors) ->
 	    execute_plan_internal(Rest, Monitors);
 	{async_task_done, PID, {failure, Error}} ->
 	    msg_router:multicast({self(), failure, MFA, Error}, Monitors),
-	    failure;
+	    {failure, Error};
 	{ping, From} ->
 	    From ! {pong, self()},
 	    wait_and_check_messages(PID, MFA, Rest, Monitors);

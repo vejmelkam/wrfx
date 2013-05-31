@@ -22,8 +22,9 @@ store(F, NL) ->
 namelists(#nllist{nls=NLS}) ->
     plist:keys(NLS).
 
-namelist(Id, #nllist{nls=NLS}) ->
-    plist:getp(Id, NLS).
+namelist(Id, #nllist{nls=NLs}) ->
+    io:format("retrieving ~p from ~p", [Id, NLs]),
+    plist:getp(Id, NLs).
 
 set_namelist(Id, NL, NLF=#nllist{nls=NLS}) ->
     NLF#nllist{nls = plist:setp(Id, NL, NLS)}.

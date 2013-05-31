@@ -9,7 +9,7 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 
 -export([new/0, keys/1, props/1, 
-	 setp/3, getp/2, getp/3, remove_key/2, get_list/2, contains/2, contains_keys/2,
+	 setp/3, getp/2, getp/3, remove_key/2, get_list/2, contains/2, contains_all/2,
 	 update_with/2, update_with/3,
 	 store/2, load/1]).
 
@@ -65,23 +65,23 @@ contains(K, [{K,V}|_P]) ->
 contains(K, [_E|P]) ->
     contains(K, P).
 
-contains_keys(Ks, P) ->
-    contains_keys(Ks, P, []).
-contains_keys([], _P, []) ->
+contains_all(Ks, P) ->
+    contains_all(Ks, P, []).
+contains_all([], _P, []) ->
     true;
-contains_keys([], _P, Missing) ->
+contains_all([], _P, Missing) ->
     {false, Missing};
-contains_keys([K|Ks], P, Missing) ->
+contains_all([K|Ks], P, Missing) ->
     case contains(K, P) of
-	true ->
-	    contains_keys(Ks, P, Missing);
+	{true, _} ->
+	    contains_all(Ks, P, Missing);
 	false ->
-	    contains_keys(Ks, P, [K|Missing])
+	    contains_all(Ks, P, [K|Missing])
     end.
 
 remove_key(K, P) ->
     remove_key(K, P, []).
-remove_key(K, [], A) ->
+remove_key(_K, [], A) ->
     lists:reverse(A);
 remove_key(K, [{K, _V}|Ps], A) ->
     remove_key(K, Ps, A);

@@ -11,7 +11,7 @@
 %% ------------------------------------------------------------------
 
 -export([start_link/0]).
--export([list_jobs/0, add_job/1, remove_job/1, get_job_pid/1]).
+-export([active_jobs/0, run_job/1, schedule_job/1, cancel_job/1, get_job_pid/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -29,20 +29,25 @@ start_link() ->
 
 
 %% @spec jobs(pid()) -> [pid()]
-list_jobs() ->
+active_jobs() ->
     gen_server:call(?SERVER, list_jobs).
 
 %% @spec add_job(J::job_desc()) -> success | failure.
-add_job(J) ->
-    wrfx_db:store(J),
-    gen_server:call(?SERVER, {add_job, J}).
+run_job(J=#job_desc{cfg=C}) ->
+    C2 = plist:setp(schedule, now, C),
+    gen_server:call(?SERVER, {schedule_job, J#job_desc{cfg=C2}}).
 
+schedule_job(J) ->
+    gen_server:call(?SERVER, {schedule_job, J}).
+    
 %% @spec remove_job(Jid::term()) -> success | failure.
-remove_job(Jid) ->
-    {success, PID} = get_job_pid(Jid),
-    J = sched:job_desc(PID),
-    wrfx_db:delete(J),
-    gen_server:call(?SERVER, {remove_job, PID}).
+cancel_job(Jid) ->
+    case get_job_pid(Jid) of
+	{success, PID} ->
+	    gen_server:call(?SERVER, {cancel_job, PID});
+	{failure, E} ->
+	    {failure, E}
+    end.
 
 %% @spec get_job(Jid::term()) -> {success, pid()} | failure
 get_job_pid(Jid) ->
@@ -55,14 +60,15 @@ get_job_pid(Jid) ->
 
 init(_Args) ->
     Js = wrfx_db:all(job_desc),
-    Infos = lists:map(fun start_job/1, Js),
+    AutoJs = lists:filter(fun (#job_desc{cfg=C}) -> plist:getp(auto_start, C) end, Js),
+    Infos = lists:map(fun start_job/1, AutoJs),
     {ok, Infos}.
 
 
 handle_call(list_jobs, _From, Infos) ->
     {reply, plist:keys(Infos), Infos};
 
-handle_call({add_job, J}, _From, Infos) ->
+handle_call({schedule_job, J}, _From, Infos) ->
     Info = start_job(J),
     {reply, ok, [Info|Infos]};
 
@@ -72,8 +78,12 @@ handle_call({remove_job, Jid}, _From, Infos) ->
     {reply, success, plist:remove_key(Jid, Infos)};
 
 handle_call({get_job_pid, Jid}, _From, Infos) ->
-    PID = plist:getp(Jid, Infos),
-    {reply, {success, PID}, Infos};
+    case plist:getp(Jid, Infos, not_found) of
+	not_found ->
+	    {reply, {failure, not_found}, Infos};
+	PID ->
+	    {reply, {success, PID}, Infos}
+    end;
 
 handle_call(terminate, _From, Infos) ->
     lists:foreach(fun ({_Jid, PID}) -> success = sched:stop(PID) end, Infos),

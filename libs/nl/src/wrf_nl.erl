@@ -23,7 +23,6 @@
 
 read_config(NL) ->
     % read in configuration parts we need to know to manipulate this NL further
-
     TC = nllist:namelist("time_control", NL),
 
     P = read_time_range(TC, plist:new()),

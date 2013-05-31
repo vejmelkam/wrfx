@@ -45,7 +45,6 @@ wait_loop(J=#job_desc{id=Id, cfg=C}) ->
     Sched = plist:getp(schedule, C),
     {_D, TNow} = calendar:universal_time(),
     T = time_to_next_run_sec(Sched, TNow),
-    io:format("wait_loop: waiting ~p seconds to run~n", [T]),
     receive
 	{From, status} ->
 	    {_D2, TNow2} = calendar:universal_time(),
@@ -60,12 +59,12 @@ wait_loop(J=#job_desc{id=Id, cfg=C}) ->
 	    {M, F} = plist:getp(mf, C),
 	    S = self(),
 	    PID = spawn(fun () -> S ! {self(), job_done, M:F(C)} end),
-	    io:format("wait_loop: starting job ~p:~p, PID is ~p", [M, F, PID]),
 	    run_loop(J, PID)
     end.
 
 
-run_loop(J, PID) ->
+run_loop(J=#job_desc{cfg=C}, PID) ->
+    S = plist:getp(schedule, C),
     receive
 	{From, status} ->
 	    From ! {self(), running},
@@ -74,10 +73,17 @@ run_loop(J, PID) ->
 	    From ! {self(), exiting},
 	    exited;
 	{PID, job_done, _R} ->
-	    wait_loop(J)
+	    case S of
+		now ->
+		    success;
+		_ ->
+		    wait_loop(J)
+	    end
     end.
 		
 
+time_to_next_run_sec(now, _T) ->
+    0;
 time_to_next_run_sec({JH, JM, JS}, {H, M, S}) ->
     T = (JH - H) * 3600 + (JM - M) * 60 + (JS - S),
     case T < 0 of
