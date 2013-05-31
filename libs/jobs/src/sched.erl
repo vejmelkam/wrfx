@@ -6,15 +6,18 @@
 
 -include_lib("util/include/job_desc.hrl").
 
-start(J) ->
-    spawn(fun() -> wait_loop(J) end).
+start(J=#job_desc{}) ->
+    spawn(fun() -> wait_loop(J) end);
 
+start(Jid) ->
+    {success, J} = wrfx_db:lookup({job_desc, Jid}),
+    start(J).
 
 status(PID) ->
     PID ! {self(), status},
     receive
-	{PID, running} ->
-	    running;
+	{PID, running, Since} ->
+	    {running, Since};
 	{PID, waiting, T} ->
 	    {waiting, T}
     after 1000 ->
@@ -41,7 +44,7 @@ job_desc(PID) ->
     end.		
 
 
-wait_loop(J=#job_desc{id=Id, cfg=C}) ->
+wait_loop(J=#job_desc{cfg=C}) ->
     Sched = plist:getp(schedule, C),
     {_D, TNow} = calendar:universal_time(),
     T = time_to_next_run_sec(Sched, TNow),
@@ -51,27 +54,30 @@ wait_loop(J=#job_desc{id=Id, cfg=C}) ->
 	    From ! {self(), waiting, time_to_next_run_sec(Sched, TNow2)},
 	    wait_loop(J);
 	{From, stop} ->
-	    From ! {self(), stopped},
-	    success;
-	{From, get_id} ->
-	    {self(), id, Id}
+	    From ! {self(), stopped};
+	{From, get_job_desc} ->
+	    From ! {self(), job_desc, J},
+	    wait_loop(J)
     after T * 1000 ->
 	    {M, F} = plist:getp(mf, C),
 	    S = self(),
-	    PID = spawn(fun () -> S ! {self(), job_done, M:F(C)} end),
-	    run_loop(J, PID)
+	    PID = spawn(fun () -> S ! {self(), job_done, M:F(J)} end),
+	    run_loop(J, calendar:local_time(), PID)
     end.
 
 
-run_loop(J=#job_desc{cfg=C}, PID) ->
+run_loop(J=#job_desc{cfg=C}, StartTime, PID) ->
     S = plist:getp(schedule, C),
     receive
 	{From, status} ->
-	    From ! {self(), running},
-	    run_loop(J, PID);
-	{From, exit} ->
-	    From ! {self(), exiting},
-	    exited;
+	    From ! {self(), running, StartTime},
+	    run_loop(J, StartTime, PID);
+	{From, stop} ->
+	    % @TODO: job should be killed here
+	    From ! {self(), stopped};
+	{From, get_job_desc} ->
+	    From ! {self(), job_desc, J},
+	    wait_loop(J);
 	{PID, job_done, _R} ->
 	    case S of
 		now ->

@@ -33,18 +33,26 @@ ping_planner(PID) ->
 %% @spec wait_for_plan(PID::pid()) -> {plan_complete, pid(), term()}
 wait_for_plan(PID) ->
     receive
-	{plan_complete, PID, Result} ->
+	{PID, plan_complete, Result} ->
 	    Result
     end.
     
 
-%% @doc Executes a plan asynchronously, returns immediately with
-%%      the pid of the running plan.  Sends messages about plan progress to
-%%      monitors in list M.
+%% @doc
+%% Executes a plan asynchronously, returns immediately with
+%% the pid of the running plan.  Sends messages about plan progress to
+%% monitors in list M.
+%%
+%% Monitors are sent the following messages:
+%%
+%% {PID, success} - plan completed successfully
+%% {PID, task_done, Text} - a task has been completed
+%% {PID, failure, Error} - a task has failed, plan execution will not continue
+%%
 %% @spec execute_plan(plan(), [pid()]) -> pid()
 execute_plan(#plan{tasks=T}, Monitors) ->
     S = self(),
-    spawn(fun () -> S ! {plan_complete, self(), execute_plan_internal(T, Monitors)} end).
+    spawn(fun () -> S ! {self(), plan_complete, execute_plan_internal(T, Monitors)} end).
 
 
 execute_plan_internal([], Monitors) ->
@@ -59,10 +67,10 @@ execute_plan_internal([MFA={M,F,A}|Rest], Monitors) ->
 wait_and_check_messages(PID, MFA, Rest, Monitors) ->
     receive
 	{async_task_done, PID, {success, Text}} ->
-	    msg_router:multicast({self(), task_done, MFA, Text}, Monitors),
+	    msg_router:multicast({self(), task_done, Text}, Monitors),
 	    execute_plan_internal(Rest, Monitors);
 	{async_task_done, PID, {failure, Error}} ->
-	    msg_router:multicast({self(), failure, MFA, Error}, Monitors),
+	    msg_router:multicast({self(), failure, Error}, Monitors),
 	    {failure, Error};
 	{ping, From} ->
 	    From ! {pong, self()},

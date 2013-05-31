@@ -8,10 +8,11 @@
 -module(atime).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -export([dt_shift_hours/2, dt_shift_days/2, d_shift_days/2]).
--export([dt_hours_since/2, dt_seconds_between/2]).
+-export([dt_hours_between/2, dt_seconds_between/2]).
 -export([dt_round_hours/2]).
 -export([is_before/2, is_after/2, compare/2]).
--export([dt_mdhm_str/1]).
+-export([dt_mdhm_str/1, dt_ts_str/1]).
+-export([dt_covering_days/2]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -44,7 +45,7 @@ d_shift_days(Date, D) ->
     DTD = calendar:date_to_gregorian_days(Date),
     calendar:gregorian_days_to_date(DTD + D).
 
-dt_hours_since(DTFrom, DTTo) ->
+dt_hours_between(DTFrom, DTTo) ->
     DTSTo = calendar:datetime_to_gregorian_seconds(DTTo),
     DTSFrom = calendar:datetime_to_gregorian_seconds(DTFrom),
     (DTSTo - DTSFrom) div 3600.
@@ -73,6 +74,17 @@ compare(DT1, DT2) ->
 dt_mdhm_str({{_Y,M,D}, {H,Min,_S}}) ->
     lists:flatten(io_lib:format("~2..0B-~2..0B_~2..0B:~2..0B", [M, D, H, Min])).
 
+dt_ts_str({{Y, M, D}, {H, Min, S}}) ->
+    lists:flatten(io_lib:format("~4..0B~2..0B~2..0B:~2..0B~2..0B~2..0B", [Y, M, D, H, Min, S])).
+
+
+dt_covering_days({D1, _}, {D2, _}) ->
+    days_covering(D1, D2, []).
+    
+days_covering(D, D, Ds) ->
+    lists:reverse([D|Ds]);
+days_covering(D1, D2, Ds) ->
+    days_covering(d_shift_days(D1, 1), D2, [D1|Ds]).
 
 -ifdef(TEST).
 
@@ -82,7 +94,7 @@ dt_hour_shift_test() ->
     ?assert(dt_shift_hours({{2012, 10, 2}, {0, 1, 1}}, -5) =:= {{2012,10,1},{19,1,1}}).
 
 dt_hours_since_test() ->
-    ?assert(dt_hours_since({{2012, 10, 1}, {15, 12, 0}}, {{2012, 10, 1}, {17, 29, 0}}) =:= 2).
+    ?assert(dt_hours_between({{2012, 10, 1}, {15, 12, 0}}, {{2012, 10, 1}, {17, 29, 0}}) =:= 2).
 
 -endif.
     

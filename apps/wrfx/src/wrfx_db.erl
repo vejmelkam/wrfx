@@ -62,13 +62,7 @@ lookup(R,N) when N > 1 ->
 
 
 list_keys(T) ->
-    try
-	Ks = mnesia:dirty_all_keys(T),
-	{success, Ks}
-    catch
-	{'EXIT', {aborted, R}} ->
-	    {failure, R}
-    end.
+    mnesia:dirty_all_keys(T).
 
 all(T) ->
     {atomic, R} = mnesia:transaction(fun () -> mnesia:foldl(fun (X, A) -> [X|A] end, [], T) end, 1),

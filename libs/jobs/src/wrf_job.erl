@@ -36,6 +36,7 @@ check_config(no_mpi, C) ->
     PID = plan_runner:execute_plan(#plan{id=wrf_serial_job_check, tasks=Ts}, []),
     plan_runner:wait_for_plan(PID);
 
+
 check_config(with_mpi, C) ->
     
     Ts = [ {tasks_verify, check_keys,
@@ -50,7 +51,7 @@ check_config(with_mpi, C) ->
     plan_runner:wait_for_plan(PID).
     
 
-execute(CfgOverw) ->
+execute(#job_desc{cfg=CfgOverw}) ->
 
     % read the namelist configuration from Cfg1 and update what is necessary from Cfg2
     {success, WRFTempl} = wrfx_db:lookup({nllist, plist:getp(wrf_nl_template_id, CfgOverw)}),
@@ -89,18 +90,21 @@ execute(CfgOverw) ->
     % construct job name using From
     JN = io_lib:format("wrf_job_~s", [esmf:time_to_string(From)]),
 
-    % retrieve GRIB files
-    GribSrc = lists:nth(1, plist:getp(grib_sources, Cfg)),
-    {{CovFrom, CovTo}, VtableFile, GribFiles} = retrieve_grib_files(GribSrc, From, To),
-
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),
     WPSExecDir = filename:join(Wkspace, "wps_exec_dir_for_" ++ JN),
     WRFExecDir = filename:join(Wkspace, "wrf_exec_dir_for_" ++ JN),
 
+    % open a logger that will record all plan activity
+    Log = logd:open([stdio, filename:join(Wkspace, io_lib:format("~s.log", [JN]))]),
+
     % ensure these workspaces are empty
     filesys:remove_directory(WPSExecDir),
     filesys:remove_directory(WRFExecDir),
+
+    % retrieve GRIB files
+    GribSrc = lists:nth(1, plist:getp(grib_sources, Cfg)),
+    {{CovFrom, CovTo}, VtableFile, GribFiles} = retrieve_grib_files(GribSrc, From, To),
 
     % update cfg with wps: GRIB file time limits, vtable file to use and wrf: from-to range
     Cfg2 = plist:update_with([{grib_files, GribFiles},
@@ -123,18 +127,18 @@ execute(CfgOverw) ->
     % plan & execute WPS job
     Plan = plan_wps_exec:make_exec_plan(Cfg3),
 
-    L = plan_logger:start(stdio),
-    L2 = plan_logger:start("/tmp/wps_exec_plan.log"),
-    PID = plan_runner:execute_plan(Plan, [L, L2]),
+    PL = plan_logger:start(Log),
+    PID = plan_runner:execute_plan(Plan, [PL]),
     case plan_runner:wait_for_plan(PID) of
      	{success, _} ->
-     	    prep_wrf(Cfg3);
+     	    prep_wrf(Cfg3, Log);
 	R ->
+	    logd:close(Log),
 	    R
     end.
 
 
-prep_wrf(Cfg) ->
+prep_wrf(Cfg, Log) ->
 
     % Make an execution plan and run it (this does everything except submitting the wrf_job
     Plan = plan_wrf_prep:make_exec_plan(Cfg),
@@ -143,39 +147,52 @@ prep_wrf(Cfg) ->
     ExecM = plist:getp(wrf_exec_method, Cfg),
     BuildT = plist:getp(wrf_build_type, Cfg),
     
-    L = plan_logger:start(stdio),
-    PID = plan_runner:execute_plan(Plan, [L]),
+    PL = plan_logger:start(Log),
+    PID = plan_runner:execute_plan(Plan, [PL]),
     case plan_runner:wait_for_plan(PID) of
 	{success,_} ->
-	    run_wrf(ExecM, BuildT, Cfg);
+	    run_wrf(ExecM, BuildT, Cfg, Log);
 	R ->
+	    logd:close(Log),
 	    R
     end.
 
 
-run_wrf(immediate, no_mpi, Cfg) ->
+run_wrf(immediate, no_mpi, Cfg, Log) ->
     Dir = plist:getp(wrf_exec_dir, Cfg),
+    logd:message("starting wrf.exe in immediate and serial mode", Log),
     R = tasks_exec:execute(filename:join(Dir, "wrf.exe"),
 			   [ {in_dir, Dir}, {output_type, stdout},
 			     {exit_check, {scan_for, "SUCCESS"}},
 			     {store_output_to, filename:join(Dir, "wrf.output")} ]),
     case R of
 	{success, _Msg} ->
-	    post_wrf(Cfg);
+	    logd:message("WRF completed succesfully", Log),
+	    post_wrf(Cfg, Log);
 	_ ->
+	    logd:message("WRF execution failed", Log),
+	    logd:close(Log),
 	    R
     end;
 
-run_wrf(immediate, with_mpi, Cfg) ->
+run_wrf(immediate, with_mpi, Cfg, Log) ->
 
+    logd:message("setting up immediate parallel run of WRF", Log),
+    
     % retrieve runtime parameters from configuration
     Dir = plist:getp(wrf_exec_dir, Cfg),
     Machines = plist:getp(mpi_nodes, Cfg),
     NP = integer_to_list(plist:getp(mpi_nprocs, Cfg)),
     MPI = plist:getp(mpi_exec_name, Cfg),
 
+    logd:message(io_lib:fwrite("creating machine file with nodes ~p", [Machines]), Log),
+
     % write a machinefile into the wrf directory
     file:write_file(filename:join(Dir, "node_list"), string:join(Machines, "\n")),
+
+    logd:message("invoking mpiexec NOW.", Log),
+
+    Start = calendar:local_time(),
 
     % execute the mpiexec/mpirun command as per configuration
     R = tasks_exec:execute(MPI,
@@ -185,20 +202,24 @@ run_wrf(immediate, with_mpi, Cfg) ->
 			    {store_output_to, filename:join(Dir, "wrf.output")}]),
     case R of
 	{success, _Msg} ->
-	    post_wrf(Cfg);
+	    logd:message(io_lib:fwrite("mpiexec/WRF execution success after ~p seconds.", [atime:dt_seconds_between(Start, calendar:local_time())]), Log),
+	    post_wrf(Cfg, Log);
 	_ ->
+	    logd:close(Log),
 	    R
     end.
 
 
 %% @TODO: this step should be converted into a plan as well
-post_wrf(Cfg) ->
+post_wrf(Cfg, Log) ->
     WPSDir = plist:getp(wps_exec_dir, Cfg),
     WRFDir = plist:getp(wrf_exec_dir, Cfg),
     WPSL = [ "geogrid.output", "ungrib.output", "metgrid.output",
 	     "geogrid.log", "ungrib.log", "metgrid.log",
 	     "namelist.wps" ],
     WRFL = [ "namelist.input", "real.output", "wrf.output" ],
+
+    logd:message("moving all files to storage", Log),
 
     Dom = "outputs/" ++ plist:getp(job_name, Cfg),
 
@@ -210,6 +231,14 @@ post_wrf(Cfg) ->
     WRFOuts = filesys:list_dir_regexp(WRFDir, "wrfout.+"),
     lists:map(fun (X) -> wrfx_fstor:store({Dom, X}, filename:join(WRFDir, X)) end, WRFOuts),
 
+    % move log as well
+    logd:message("removing working directories", Log),
+    logd:close(Log),
+
+    LFName = io_lib:format("~s.log", [plist:getp(job_name, Cfg)]),
+    PathLF = filename:join(wrfx_db:get_conf(workspace_root), LFName),
+    wrfx_fstor:store({Dom, "plan.log"}, PathLF),
+
     % clean out and remove directories
     filesys:remove_directory(plist:getp(wps_exec_dir, Cfg)),
     filesys:remove_directory(plist:getp(wrf_exec_dir, Cfg)),
@@ -220,7 +249,6 @@ post_wrf(Cfg) ->
 make_namelists(Cfg) ->
     {success, WPST} = wrfx_db:lookup({nllist, plist:getp(wps_nl_template_id, Cfg)}),
     {success, WRFT} = wrfx_db:lookup({nllist, plist:getp(wrf_nl_template_id, Cfg)}),
-    io:format("~p~n", [nllist:namelists(WPST)]),
     WPSNL = wps_nl:write_config(Cfg, WPST),
     WRFNL = wrf_nl:write_config(Cfg, WRFT),
     plist:update_with([ {wps_nl, WPSNL}, {wrf_nl, WRFNL} ], Cfg).

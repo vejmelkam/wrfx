@@ -1,46 +1,34 @@
 
 
+%% @doc
+%% A plan logger is a plan monitor that logs everything that happens
+%% to a logd process.
+%%
+
 -module(plan_logger).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([start/1]).
+-export([start/1, stop/1]).
 
 
-%% @doc Starts a plan logger that either logs to stdio if argument is stdio or to a file
-%%      if the filename is a string.
-%% @spec start(D:: stdio|string()) -> pid()
-start(stdio) ->
-    spawn(fun () -> logger_msg_loop(stdio) end);
-start(Filename) ->
-    {ok, D} = file:open(Filename, [write]),
-    spawn(fun () -> logger_msg_loop(D) end).
+start(PID) ->
+    spawn(fun () -> plan_logger_loop(PID) end).
 
 
-logger_msg_loop(Dev) ->
+plan_logger_loop(PID) ->
     receive
-	{_PID, task_done, MFA, Text} ->
-	    log_message(Dev, task_done, MFA, Text),
-	    logger_msg_loop(Dev);
-	{_PID, failure, MFA, Text} ->
-	    log_message(Dev, failure, MFA, Text),
-	    % note: closing a non-file device just returns an error,
-	    % so this call is safe even with Dev = stdio.
-	    file:close(Dev);
+	{_PID, task_done, Text} ->
+	    logd:message(io_lib:fwrite("[task complete] ~s", [Text]), PID),
+	    plan_logger_loop(PID);
+	{_PID, failure, Error} ->
+	    logd:message(io_lib:fwrite("[FAILED] ~s", [Error]), PID);
 	{_PID, success} ->
-	    log_message(Dev, plan_complete, [], []),
-	    file:close(Dev)
+	    logd:message("[SUCCESS] plan complete", PID);
+	{_PID, stop} ->
+	    logd:message("[PLAN LOGGER STOPPED]", PID)
     end.
 
-		   
-log_message(D, task_done, _MFA, Text) ->
-    T = atime:dt_mdhm_str(calendar:local_time()),
-    log_string(D, io_lib:format("Task complete [~s]: ~s.~n", [T, lists:flatten(Text)]));
-log_message(D, failure, {M, F, _A}, Text) ->
-    log_string(D, io_lib:format("Plan execution failed at task ~p:~p with error ~s.~n", [M, F, lists:flatten(Text)]));
-log_message(D, plan_complete, [], []) ->
-    T = atime:dt_mdhm_str(calendar:local_time()),
-    log_string(D, io_lib:format("Plan executed successfully at [~s].~n", [T])).
 
-log_string(stdio, S) ->
-    io:format(S);
-log_string(Dev, S) ->
-    file:write(Dev, S).
+stop(PID) ->
+    PID ! {self(), stop},
+    ok.
+

@@ -1,5 +1,5 @@
 
-%
+%% @doc
 %  A resolver computes storage ids and URLs for GRIB files.
 %  Due to operational constraints, it may happen that current
 %  cycle run files are unavailable, in this case, older cycle
@@ -19,18 +19,20 @@
 -endif.
 
 
+%% @spec vtable() -> string()
 vtable() ->
     "ungrib/Variable_Tables/Vtable.NAM".
 
 
+%% @spec domain() -> string()
 domain() ->
     "nam_218".
 
-
+%% @spec url_prefix() -> string()
 url_prefix() ->
     "http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/".
 
-
+%% @spec manifest(From :: datetime(), To :: datetime(), Delta :: integer()) -> [string()]
 manifest(From, To, Delta) ->
 
     % estimate the latest cycle that was run and is available online
@@ -57,7 +59,7 @@ manifest(From, To, Delta) ->
 build_file_list(Now, To, LatestCycle, Coverage={_CFrom, CTo}, LastRef, Files) when To > CTo->
     NextNow = atime:dt_shift_hours(Now, 1),
     CT = cull_cycle(get_cycle_time(Now, 0), LatestCycle),
-    H = forecast_hour(atime:dt_hours_since(CT, Now)),
+    H = forecast_hour(atime:dt_hours_between(CT, Now)),
     case {CT, H} == LastRef of
 	true ->
 	    build_file_list(NextNow, To, LatestCycle, Coverage, LastRef, Files);
