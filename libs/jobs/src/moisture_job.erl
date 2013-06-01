@@ -27,15 +27,15 @@ execute(#job_desc{cfg=Cfg}) ->
     Log = logd:open([stdio, filename:join(Dir, "moisture_job.log")]),
 
     % retrieve all xls files from Mesowest (or from file cache)
-    retrieve_xls_files(Ds, Ss),
+    Ds = lists:map(fun format_time/1, atime:dt_covering_days(From, To)),
+%    retrieve_xls_files(Ds, Ss),
 
     % convert to obs files
-    file:write(filename:join(Dir, "station_list"), string:join(Ss, "\n")),
-    write_obs_table(Dir, plist:getp(obs_table, Cfg)),
+%    file:write(filename:join(Dir, "station_list"), string:join(Ss, "\n")),
+%    write_obs_table(Dir, plist:getp(obs_table, Cfg)),
 
     % @TODO: add xls -> obs files code here
 
-    Ds = lists:map(fun format_time/1, atime:dt_covering_days(From, To)),
     T = [ {tasks_exec, execute, [ filename:join(SDir, "scrape_stations.py"),
 				  [{in_dir, Dir},
 				   {exit_check, exit_code},

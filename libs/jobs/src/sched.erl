@@ -7,10 +7,13 @@
 -include_lib("util/include/job_desc.hrl").
 
 start(J=#job_desc{}) ->
+    io:format("starting job ~p~n", [J]),
     spawn(fun() -> wait_loop(J) end);
 
 start(Jid) ->
+    io:format("looking for job ~p in dbase~n", [Jid]),
     {success, J} = wrfx_db:lookup({job_desc, Jid}),
+    io:format("found ~p in dbase~n", [J]),
     start(J).
 
 status(PID) ->
