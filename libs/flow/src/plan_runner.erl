@@ -10,7 +10,7 @@
 -module(plan_runner).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -export([execute_plan/2, ping_planner/1, wait_for_plan/1]).
--include("include/flow.hrl").
+-include_lib("flow/include/flow.hrl").
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -52,32 +52,56 @@ wait_for_plan(PID) ->
 %% @spec execute_plan(plan(), [pid()]) -> pid()
 execute_plan(#plan{tasks=T}, Monitors) ->
     S = self(),
-    spawn(fun () -> S ! {self(), plan_complete, execute_plan_internal(T, Monitors)} end).
+    spawn(fun () -> S ! {self(), plan_complete, execute_plan_internal(T, Monitors, [])} end).
 
 
-execute_plan_internal([], Monitors) ->
+execute_plan_internal([], Monitors, PlanInstr) ->
     msg_router:multicast({self(), success}, Monitors),
-    {success, []};
-execute_plan_internal([MFA={M,F,A}|Rest], Monitors) ->
+    {success, PlanInstr};
+execute_plan_internal([{M,F,A}|Rest], Monitors, PlanInstr) ->
     S = self(),
-    PID = spawn(fun () -> S ! {async_task_done, self(), apply(M, F, A)} end),
-    wait_and_check_messages(PID, MFA, Rest, Monitors).
+    PID = spawn(fun () -> S ! {async_task_done, self(), [], apply(M, F, A)} end),
+    wait_and_check_messages(PID, Rest, Monitors, PlanInstr);
+execute_plan_internal([T = #instr_task{mfa = {M,F,A}}|Rest], Monitors, PlanInstr) ->
+    S = self(),
+    PID = spawn(fun () -> S ! {async_task_done, self(), init_instr(T), apply(M, F, A)} end),
+    wait_and_check_messages(PID, Rest, Monitors, PlanInstr).
 
-
-wait_and_check_messages(PID, MFA, Rest, Monitors) ->
+wait_and_check_messages(PID, Rest, Monitors, Inst) ->
     receive
-	{async_task_done, PID, {success, Text}} ->
+	{async_task_done, PID, TaskInstr, {success, Text}} ->
 	    msg_router:multicast({self(), task_done, Text}, Monitors),
-	    execute_plan_internal(Rest, Monitors);
-	{async_task_done, PID, {failure, Error}} ->
+	    execute_plan_internal(Rest, Monitors, update_plan_instr(TaskInstr, Inst));
+	{async_task_done, PID, TaskInstr, {failure, Error}} ->
 	    msg_router:multicast({self(), failure, Error}, Monitors),
 	    {failure, Error};
 	{ping, From} ->
 	    From ! {pong, self()},
-	    wait_and_check_messages(PID, MFA, Rest, Monitors);
+	    wait_and_check_messages(PID, Rest, Monitors, Inst);
 	BadMsg ->
 	    io:format("Unexpected message [~p]~n", [BadMsg])
     end.
+
+
+init_instr(#instr_task{what = W, with_key = K}) ->
+    lists:foldl(fun (X, P) -> init_instr(X, P) end, [{what, W}, {with_key, K}], W).
+
+init_instr(run_time, P) ->
+    plist:setp(started_at, calendar:local_time(), P).
+
+update_plan_instr([], PlanInstr) ->
+    PlanInstr;
+update_plan_instr(TaskInstr, PlanInstr) ->
+    Key = plist:getp(with_key, TaskInstr),
+    W = plist:getp(what, TaskInstr),
+    InstrResult = lists:foldl(fun (X, P) -> finalize_instr(X, P, TaskInstr) end, [], W),
+    plist:setp(Key, InstrResult, PlanInstr).
+
+finalize_instr(run_time, P, Tinstr) ->
+    Start = plist:getp(started_at, Tinstr),
+    Seconds = atime:dt_seconds_between(Start, calendar:local_time()),
+    plist:setp(run_time, Seconds, P).
+
 
 
 -ifdef(TEST).

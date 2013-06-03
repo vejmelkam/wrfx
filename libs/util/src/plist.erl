@@ -10,6 +10,7 @@
 
 -export([new/0, keys/1, props/1, 
 	 setp/3, getp/2, getp/3, remove_key/2, get_list/2, contains/2, contains_all/2,
+	 subset/2,
 	 update_with/2, update_with/3,
 	 store/2, load/1]).
 
@@ -94,6 +95,14 @@ update_with(UP, P) ->
 
 update_with(KL, VL, P) ->
     update_with(lists:zip(KL, VL), P).
+
+
+subset(Ks, P) ->
+    subset(Ks, P, []).
+subset([], _P, S) ->
+    lists:reverse(S);
+subset([K|Ks], P, S) ->
+    subset(Ks, P, [{K, getp(K, P)}|S]).
 
 
 store(F, P) ->

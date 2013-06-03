@@ -11,7 +11,7 @@
 
 -module(rnrs_nam218).
 -author("Martin Vejmelka <vejmelkam@gmail.com").
--export([domain/0, url_prefix/0, manifest/3, vtable/0]).
+-export([domain/0, url_prefix/0, manifest/3, vtable/0, nl_updates/0]).
 
 
 -ifdef(TEST).
@@ -31,6 +31,10 @@ domain() ->
 %% @spec url_prefix() -> string()
 url_prefix() ->
     "http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/".
+
+nl_updates() ->
+    [{"num_metgrid_levels", [40]}].
+
 
 %% @spec manifest(From :: datetime(), To :: datetime(), Delta :: integer()) -> [string()]
 manifest(From, To, Delta) ->

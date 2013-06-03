@@ -7,7 +7,7 @@
 -module(moisture_job).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 
--include_lib("util/include/job_desc.hrl").
+-include_lib("jobs/include/jobs.hrl").
 -include_lib("flow/include/flow.hrl").
 -export([check/1, execute/1]).
 
@@ -16,11 +16,11 @@
 %% a best-effort check if this job will be executable.
 %% @spec check_config(C::plist()) -> {success, []}|{failure, Reason}
 %%
-check(#job_desc{cfg=_C}) ->
-    {success, []}.
+check(J=#job_desc{cfg=_C}) ->
+    {success, "configuration check success"}.
 
 
-execute(#job_desc{cfg=Cfg}) ->
+execute(J=#job_desc{cfg=Cfg}) ->
     [Dir, From, To, Ss] = plist:get_list([wrf_exec_dir, wrf_from, wrf_to, stations], Cfg),
     SDir = wrfx_db:get_conf(scraper_dir),
 

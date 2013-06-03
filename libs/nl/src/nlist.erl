@@ -13,14 +13,18 @@ all_entries(#nl{entries=E}) ->
     plist:keys(E).
 
 entry(K, #nl{entries=E}) ->
-    plist:getp(K, E).
+    case plist:getp(K, E) of
+	[V] ->
+	    V;
+	V ->
+	    V
+    end.
 
-set_entry(K, V, NL=#nl{entries=E}) ->
+set_entry(K, V, NL=#nl{entries=E}) when is_list(V) ->
     NL#nl{entries=plist:setp(K, V, E)}.
 
 entries(K, #nl{entries=E}) ->
-    lists:flatten(plist:get_list(K, E)).
-
+    plist:get_list(K, E).
 
 
 %
@@ -32,7 +36,7 @@ to_text(#nl{id=Id, entries=E}) ->
     lists:flatten(["&", Id, $\n, S2, "/\n\n"]).
 
 
-write_entry({K, V}) ->
+write_entry({K, V}) when is_list(V) ->
     VS = lists:map(fun write_value/1, V),
     [K, lists:duplicate(36-length(K), $ ), "=\t", string:join(VS, ",\t"), ", \n"].
 

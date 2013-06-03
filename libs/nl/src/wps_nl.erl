@@ -29,7 +29,7 @@ read_share(Sh, P) ->
     TE = esmf:parse_time(lists:nth(1, nlist:entry("end_date", Sh))),
     IS = lists:nth(1, nlist:entry("interval_seconds", Sh)),
     ND = lists:nth(1, nlist:entry("max_dom", Sh)),
-    plist:update_with(P, [{wps_from, TS}, {wps_to, TE}, {grib_interval_seconds, IS}, {num_domains, ND}]).
+    plist:update_with([{wps_from, TS}, {wps_to, TE}, {grib_interval_seconds, IS}, {num_domains, ND}], P).
 
 
 write_config(Cfg, NL) ->

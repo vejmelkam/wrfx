@@ -36,11 +36,11 @@ read_time_range(TC, P) ->
     TE = {list_to_tuple(nlist:entries(["end_year", "end_month", "end_day"], TC)),
 	  list_to_tuple(nlist:entries(["end_hour", "end_minute", "end_second"], TC))},
 
-    plist:update_with(P, [{wrf_from, TS}, {wrf_to, TE}]).
+    plist:update_with([wrf_from, wrf_to], [TS, TE], P).
 
 
 read_domain_info(Dom, P) ->
-    plist:setp(num_domains, lists:nth(1, nlist:entry("max_dom", Dom)), P).
+    plist:setp(num_domains, nlist:entry("max_dom", Dom), P).
 
 
 read_io_policy(TC, P) ->
@@ -50,7 +50,8 @@ read_io_policy(TC, P) ->
 
 write_config(Cfg, NL) ->
     NL2 = write_time_range(Cfg, NL),
-    write_io_policy(Cfg, NL2).
+    NL3 = write_io_policy(Cfg, NL2),
+    write_domains(Cfg, NL3).
 
 
 write_time_range(Cfg, NL) ->
@@ -95,6 +96,22 @@ write_io_policy(Cfg, NL) ->
 			  wrf_reg:nlspec("time_control", Spec)),
 
     nllist:set_namelist("time_control", TC2, NL).
+
+
+write_domains(Cfg, NL) ->
+    D = nllist:namelist("domains", NL),
+    D2 = lists:foldl(fun (X,Di) -> write_if_found(Di, X, Cfg) end, D, ["num_metgrid_levels"]),
+    nllist:set_namelist("domains", D2, NL).
+    
+write_if_found(NL, K, Cfg) ->
+    case plist:getp(K, Cfg, not_found) of
+	not_found ->
+	    NL;
+	V ->
+	    nlist:set_entry(K, V, NL)
+    end.
+
+
 
 update_namelist([], NL, _Cfg, _NLSpec) ->
     NL;

@@ -1,10 +1,9 @@
 
-
 -module(wrfx_jobmgr).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -define(SERVER, ?MODULE).
 
--include_lib("util/include/job_desc.hrl").
+-include_lib("jobs/include/jobs.hrl").
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -63,7 +62,6 @@ init(_Args) ->
     AutoJs = lists:filter(fun (#job_desc{cfg=C}) -> plist:getp(auto_start, C) end, Js),
     Infos = lists:map(fun start_job/1, AutoJs),
     {ok, Infos}.
-
 
 handle_call(list_jobs, _From, Infos) ->
     {reply, plist:keys(Infos), Infos};

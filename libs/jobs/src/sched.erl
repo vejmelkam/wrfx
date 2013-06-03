@@ -2,27 +2,23 @@
 
 -module(sched).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([start/1, stop/1, status/1, job_desc/1]).
+-export([start/1, stop/1, jstat/1, jdesc/1]).
 
--include_lib("util/include/job_desc.hrl").
+-include_lib("jobs/include/jobs.hrl").
 
 start(J=#job_desc{}) ->
-    io:format("starting job ~p~n", [J]),
     spawn(fun() -> wait_loop(J) end);
 
 start(Jid) ->
-    io:format("looking for job ~p in dbase~n", [Jid]),
     {success, J} = wrfx_db:lookup({job_desc, Jid}),
-    io:format("found ~p in dbase~n", [J]),
     start(J).
 
-status(PID) ->
+
+jstat(PID) ->
     PID ! {self(), status},
     receive
-	{PID, running, Since} ->
-	    {running, Since};
-	{PID, waiting, T} ->
-	    {waiting, T}
+	{PID, JS} ->
+	    JS
     after 1000 ->
 	    timeout
     end.
@@ -37,7 +33,7 @@ stop(PID) ->
     end.
 
 
-job_desc(PID) ->
+jdesc(PID) ->
     PID ! {self(), get_job_desc},
     receive
 	{PID, job_desc, J} ->
@@ -47,14 +43,16 @@ job_desc(PID) ->
     end.		
 
 
-wait_loop(J=#job_desc{cfg=C}) ->
+wait_loop(J=#job_desc{id = Id, cfg=C}) ->
     Sched = plist:getp(schedule, C),
     {_D, TNow} = calendar:universal_time(),
     T = time_to_next_run_sec(Sched, TNow),
     receive
 	{From, status} ->
 	    {_D2, TNow2} = calendar:universal_time(),
-	    From ! {self(), waiting, time_to_next_run_sec(Sched, TNow2)},
+	    JA = #job_activity{id = Id,
+			       status = {waiting, time_to_next_run_sec(Sched, TNow2)}},
+	    From ! {self(), JA},
 	    wait_loop(J);
 	{From, stop} ->
 	    From ! {self(), stopped};
@@ -69,11 +67,13 @@ wait_loop(J=#job_desc{cfg=C}) ->
     end.
 
 
-run_loop(J=#job_desc{cfg=C}, StartTime, PID) ->
+run_loop(J=#job_desc{id=Id, cfg=C}, StartTime, PID) ->
     S = plist:getp(schedule, C),
     receive
 	{From, status} ->
-	    From ! {self(), running, StartTime},
+	    JA = #job_activity{id = Id,
+			       status = {running, StartTime}},
+	    From ! {self(), JA},
 	    run_loop(J, StartTime, PID);
 	{From, stop} ->
 	    % @TODO: job should be killed here
@@ -81,10 +81,12 @@ run_loop(J=#job_desc{cfg=C}, StartTime, PID) ->
 	{From, get_job_desc} ->
 	    From ! {self(), job_desc, J},
 	    wait_loop(J);
-	{PID, job_done, _R} ->
+	{PID, job_done, JR} ->
+	    % store job report in database
+	    wrfx_db:store(JR),
 	    case S of
 		now ->
-		    success;
+		    JR;
 		_ ->
 		    wait_loop(J)
 	    end
