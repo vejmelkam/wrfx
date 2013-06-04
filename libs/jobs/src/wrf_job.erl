@@ -15,7 +15,10 @@
 %%
 check(#job_desc{cfg=C}) ->
     WRFId = plist:getp(wrf_id, C),
-    case tasks_verify:config_exists(WRFId) of
+    Ts = [ {tasks_verify, config_exists, [WRFId]},
+	   {tasks_verify, conditional_check, [ncks_prune_wrfout, { tasks_verify, config_exists, [ncks_path] }, C]} ],
+    PID = plan_runner:execute_plan(#plan{id=wrf_job_check, tasks=Ts}, []),
+    case plan_runner:wait_for_plan(PID) of
 	{success, _} ->
 	    WRFDir = wrfx_db:get_conf(WRFId),
 	    check_config(wrf_inst:detect_build_type(WRFDir), C);
@@ -51,7 +54,7 @@ check_config(with_mpi, C) ->
     plan_runner:wait_for_plan(PID).
     
 
-execute(J=#job_desc{cfg=CfgOverw}) ->
+execute(J=#job_desc{key = JK, cfg=CfgOverw}) ->
 
     % read the namelist configuration from Cfg1 and update what is necessary from Cfg2
     {success, WRFTempl} = wrfx_db:lookup({nllist, plist:getp(wrf_nl_template_id, CfgOverw)}),
@@ -88,12 +91,12 @@ execute(J=#job_desc{cfg=CfgOverw}) ->
 					     vanilla_wrf_v34),
 
     % construct job name using From
-    JN = io_lib:format("wrf_job_~s", [esmf:time_to_string(From)]),
+    JI = io_lib:format("~s_~s", [JK, esmf:time_to_string(From)]),
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),
-    WPSExecDir = filename:join(Wkspace, "wps_exec_dir_for_" ++ JN),
-    WRFExecDir = filename:join(Wkspace, "wrf_exec_dir_for_" ++ JN),
+    WPSExecDir = filename:join(Wkspace, "wps_exec_" ++ JI),
+    WRFExecDir = filename:join(Wkspace, "wrf_exec_" ++ JI),
 
     % ensure these workspaces are empty
     filesys:remove_directory(WPSExecDir),
@@ -115,7 +118,7 @@ execute(J=#job_desc{cfg=CfgOverw}) ->
 			      {wrf_exec_dir, WRFExecDir},
 			      {wps_install_dir, WPSInstDir},
 			      {wrf_install_dir, WRFInstDir},
-			      {job_name, JN},
+			      {job_id, JI},
 			      {nl_spec, NLSpec},
 			      {started, calendar:local_time()},
 			      {instr, []} | NLExtraKeys ], Cfg),
@@ -124,7 +127,7 @@ execute(J=#job_desc{cfg=CfgOverw}) ->
     Cfg3 = make_namelists(Cfg2),
 
     % open a logger that will record all plan activity
-    Log = logd:open([stdio, filename:join(Wkspace, io_lib:format("~s.log", [JN]))]),
+    Log = logd:open([stdio, filename:join(Wkspace, io_lib:format("~s.log", [JI]))]),
 
     run_wps(J#job_desc{cfg=Cfg3}, Log).
 
@@ -285,33 +288,56 @@ run_wrf(immediate, with_mpi, J=#job_desc{cfg=Cfg}, Log) ->
 
     % execute the mpiexec/mpirun command as per configuration
     R = tasks_exec:execute(MPI,
-			   [{in_dir, Dir}, {output_type, filename:join(Dir, "rsl.error.0000")},
+			   [{in_dir, Dir},
+			    {output_type, filename:join(Dir, "rsl.error.0000")},
 			    {exit_check, {scan_for, "SUCCESS"}},
 			    {op_args, [{args, ["--machinefile", "node_list", "-n", NP, "./wrf.exe"]}]},
 			    {store_output_to, filename:join(Dir, "wrf.output")}]),
     case R of
 	{success, _Msg} ->
 	    logd:message(io_lib:fwrite("mpiexec/WRF execution success after ~p seconds.", [atime:dt_seconds_between(Start, calendar:local_time())]), Log),
-	    post_wrf(J, Log);
+	    prune_wrfouts(plist:getp(ncks_prune_wrfout, Cfg, no_pruning), J, Log);
 	_ ->
 	    job_failed(run_wrf, J, Log, R)
     end.
 
 
-post_wrf(J=#job_desc{id=Id, cfg=Cfg}, Log) ->
+prune_wrfouts(no_pruning, J, Log) ->
+    logd:message("no pruning requested, skipping stage"),
+    post_wrf(J, Log);
+prune_wrfouts(Vars, J = #job_desc{cfg=Cfg}, Log) ->
+    Dir = plist:getp(wrf_exec_dir, Cfg),
+    NCKS = wrfx_db:get_conf(ncks_path),
+    AbsFs = lists:map(fun (X) -> filename:join(Dir, X) end, filesys:list_dir_regexp(Dir, "wrfout.+")),
+    T = [ [ {tasks_exec, execute, [ NCKS, [ {in_dir, Dir},
+					    {output_type, stdout},
+					    {op_args, [{args, ["-v", string:join(Vars, ","), File, File ++ "_pruned"]}]},
+					    {store_output_to, filename:join(Dir, "ncks.log")},
+					    {exit_check, exit_code} ] ]},
+	    {tasks_fsys, delete_file, [File]},
+	    {tasks_fsys, rename_file, [File ++ "_pruned", File]} ] || File <- AbsFs ],
+    Plan = #plan{id=prune_wrfout, tasks=lists:flatten(T)},
+    PL = plan_logger:start(Log),
+    PID = plan_runner:execute_plan(Plan, [PL]),
+    plan_runner:wait_for_plan(PID),
+    % post_wrfouts is not a critical step in the plan, so no job failure occurrs if the wrfouts cannot be pruned
+    post_wrf(J, Log).
+    
 
+
+post_wrf(J=#job_desc{key=JK, cfg=Cfg}, Log) ->
     store_output_files(J, Log),
-    JN = plist:getp(job_name, Cfg),
-    Dom = "outputs/" ++ JN,
-    LFName = lists:flatten(io_lib:format("~s.log", [JN])),
+    JI = plist:getp(job_id, Cfg),
+    Dom = "outputs/" ++ JI,
+    LFName = lists:flatten(io_lib:format("~s.log", [JI])),
 
     % remove workspace directories
     filesys:remove_directory(plist:getp(wps_exec_dir, Cfg)),
     filesys:remove_directory(plist:getp(wrf_exec_dir, Cfg)),
 
     % return a job report
-    #job_report{id = Id,
-		job_name = plist:getp(job_name, Cfg),
+    #job_report{job_id = plist:getp(job_id, Cfg),
+		job_desc_key = JK,
 		started = plist:getp(started, Cfg),
 		completed = calendar:local_time(),
 		result = {success, "SUCCESS"},
@@ -323,19 +349,19 @@ post_wrf(J=#job_desc{id=Id, cfg=Cfg}, Log) ->
 
 
 
-job_failed(A, J=#job_desc{id=Id, cfg=Cfg}, Log, {failure, Err}) ->
+job_failed(A, J=#job_desc{key=JK, cfg=Cfg}, Log, {failure, Err}) ->
 
     ErrMsg = lists:flatten(io_lib:format("job execution failed in step ~p error ~s~n", [A, Err])),
     logd:message(ErrMsg, Log),
 
     store_output_files(J, Log),
-    JN = plist:getp(job_name, Cfg),
-    Dom = "outputs/" ++ JN,
-    LFName = lists:flatten(io_lib:format("~s.log", [JN])),
+    JI = plist:getp(job_id, Cfg),
+    Dom = "outputs/" ++ JI,
+    LFName = lists:flatten(io_lib:format("~s.log", [JI])),
 
     % return a job report
-    #job_report{id=Id,
-		job_name = plist:getp(job_name, Cfg),
+    #job_report{job_id = plist:getp(job_id, Cfg),
+		job_desc_key = JK,
 		started = plist:getp(started, Cfg),
 		completed = calendar:local_time(),
 		result = {failure, ErrMsg},
@@ -348,10 +374,10 @@ job_failed(A, J=#job_desc{id=Id, cfg=Cfg}, Log, {failure, Err}) ->
 store_output_files(#job_desc{cfg=Cfg}, Log) ->
     WPSDir = plist:getp(wps_exec_dir, Cfg),
     WRFDir = plist:getp(wrf_exec_dir, Cfg),
-    JN = plist:getp(job_name, Cfg),
+    JI = plist:getp(job_id, Cfg),
 
     logd:message("moving output files to storage", Log),
-    Dom = "outputs/" ++ plist:getp(job_name, Cfg),
+    Dom = "outputs/" ++ plist:getp(job_id, Cfg),
 
     T1 = [ {wrfx_fstor, store, [{Dom, X}, filename:join(WPSDir, X)]} ||
 	     X <- [ "geogrid.output", "ungrib.output", "metgrid.output", "geogrid.log",
@@ -375,7 +401,7 @@ store_output_files(#job_desc{cfg=Cfg}, Log) ->
 
     % close log and move it to storage
     logd:close(Log),
-    LFName = io_lib:format("~s.log", [JN]),
+    LFName = io_lib:format("~s.log", [JI]),
     PathLF = filename:join(wrfx_db:get_conf(workspace_root), LFName),
     wrfx_fstor:store({Dom, LFName}, PathLF).
 
@@ -402,7 +428,6 @@ retrieve_grib_files(_Dom, _URL, [], List) ->
 retrieve_grib_files(Dom, URLBase, [Name|Names], List) ->
     case wrfx_fstor:exists({Dom, Name}) of
 	false ->
-	    io:format("Downloading [~p]~n", [URLBase ++ Name]),
 	    {success, _} = tasks_net:http_sync_get(URLBase ++ Name, "/tmp/wrfx-download"),
 	    {success, F} = wrfx_fstor:store({Dom, Name}, "/tmp/wrfx-download"),
 	    retrieve_grib_files(Dom, URLBase, Names, [F|List]);

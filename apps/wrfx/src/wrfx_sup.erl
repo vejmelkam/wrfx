@@ -26,6 +26,6 @@ start_link() ->
 init([]) ->
     {ok, { {one_for_one, 5, 10}, [
 				 ?CHILD(wrfx_fstor, worker),
-				 ?CHILD(wrfx_jobmgr, worker),
+				 ?CHILD(wrfx_jadm, worker),
 				 ?CHILD(wrfx, worker)
 				 ]} }.

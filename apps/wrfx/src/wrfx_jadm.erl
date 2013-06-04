@@ -1,5 +1,5 @@
 
--module(wrfx_jobmgr).
+-module(wrfx_jadm).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -define(SERVER, ?MODULE).
 
@@ -109,7 +109,7 @@ handle_cast(_Req, State) ->
 %% ------------------------------------------------------------------
 
 
-start_job(J=#job_desc{id=Id}) ->
+start_job(J=#job_desc{key=JK}) ->
     PID = sched:start(J),
-    {Id, PID}.
+    {JK, PID}.
 

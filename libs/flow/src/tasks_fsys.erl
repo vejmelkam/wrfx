@@ -8,7 +8,8 @@
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -export([dir_exists/1, file_exists/1,
 	 create_dir/1, create_symlink/2,
-	 write_file/2, delete_file/1]).
+	 write_file/2, delete_file/1,
+	 rename_file/2]).
 
 
 %% @doc Checks if a file exists (as a regular file) on the filesystem.
@@ -76,4 +77,13 @@ delete_file(F) ->
 	    {success, io_lib:format("file [~s] is non-existent, skipping", [F])};
 	{error, E} ->
 	    {failure, io_lib:format("error [~s] encountered while deleting file [~p]", [E, F])}
+    end.
+
+
+rename_file(Orig, New) ->
+    case file:rename(Orig, New) of
+	ok ->
+	    {success, io_lib:format("file [~s] renamed to [~s]", [Orig, New])};
+	{error, R} ->
+	    {failure, io_lib:format("failed to rename [~s] to [~s] with error ~p", [Orig, New, R])}
     end.

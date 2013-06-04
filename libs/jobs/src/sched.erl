@@ -2,7 +2,7 @@
 
 -module(sched).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([start/1, stop/1, jstat/1, jdesc/1]).
+-export([start/1, stop/1, status/1, jdesc/1]).
 
 -include_lib("jobs/include/jobs.hrl").
 
@@ -14,7 +14,7 @@ start(Jid) ->
     start(J).
 
 
-jstat(PID) ->
+status(PID) ->
     PID ! {self(), status},
     receive
 	{PID, JS} ->
@@ -43,14 +43,14 @@ jdesc(PID) ->
     end.		
 
 
-wait_loop(J=#job_desc{id = Id, cfg=C}) ->
+wait_loop(J=#job_desc{key = JK, cfg=C}) ->
     Sched = plist:getp(schedule, C),
     {_D, TNow} = calendar:universal_time(),
     T = time_to_next_run_sec(Sched, TNow),
     receive
 	{From, status} ->
 	    {_D2, TNow2} = calendar:universal_time(),
-	    JA = #job_activity{id = Id,
+	    JA = #job_activity{job_desc_key = JK,
 			       status = {waiting, time_to_next_run_sec(Sched, TNow2)}},
 	    From ! {self(), JA},
 	    wait_loop(J);
@@ -67,11 +67,11 @@ wait_loop(J=#job_desc{id = Id, cfg=C}) ->
     end.
 
 
-run_loop(J=#job_desc{id=Id, cfg=C}, StartTime, PID) ->
+run_loop(J=#job_desc{key=JK, cfg=C}, StartTime, PID) ->
     S = plist:getp(schedule, C),
     receive
 	{From, status} ->
-	    JA = #job_activity{id = Id,
+	    JA = #job_activity{job_desc_key = JK,
 			       status = {running, StartTime}},
 	    From ! {self(), JA},
 	    run_loop(J, StartTime, PID);

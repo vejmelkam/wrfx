@@ -2,7 +2,7 @@
 
 -module(tasks_verify).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([check_keys/2, namelist_exists/1, config_exists/1]).
+-export([check_keys/2, namelist_exists/1, config_exists/1, conditional_check/3]).
 
 
 check_keys(Ks, P) ->
@@ -28,5 +28,16 @@ config_exists(C) ->
 	{success, io_lib:format("Config key ~s exists", [C])}
     catch
 	_ ->
-	    {failure, io_lib:format("Configu key ~s not found", [C])}
+	    {failure, io_lib:format("Configuration key ~s not found", [C])}
     end.
+
+
+conditional_check(Key, {M,F,A}, C) ->
+    case plist:getp(Key, C, no_such_key) of
+	no_such_key ->
+	    {success, io_lib:format("Conditional check bypassed, [~s] does not exists.", [Key])};
+	_V ->
+	    apply(M,F,A)
+    end.
+	
+    
