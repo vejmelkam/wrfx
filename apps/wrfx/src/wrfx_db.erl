@@ -5,7 +5,6 @@
 %% without use of transactions.
 %%
 
-
 -module(wrfx_db).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 -define(SERVER, ?MODULE).

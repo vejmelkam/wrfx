@@ -28,7 +28,6 @@ check(#job_desc{cfg=C}) ->
 
 
 check_config(no_mpi, C) ->
-
     Ts = [ {tasks_verify, check_keys,
 	    [ [wrf_id, wps_id, wrf_exec_method, wps_nl_template_id,
 	       wrf_nl_template_id, grib_sources, schedule], C ]},
@@ -41,7 +40,6 @@ check_config(no_mpi, C) ->
 
 
 check_config(with_mpi, C) ->
-    
     Ts = [ {tasks_verify, check_keys,
 	    [ [wrf_id, wps_id, wrf_exec_method, wps_nl_template_id,
 	       wrf_nl_template_id, grib_sources, schedule, mpi_exec_name,
@@ -91,7 +89,7 @@ execute(J=#job_desc{key = JK, cfg=CfgOverw}) ->
 					     vanilla_wrf_v34),
 
     % construct job name using From
-    JI = io_lib:format("~s_~s", [JK, esmf:time_to_string(From)]),
+    JI = lists:flatten(io_lib:format("~s_~s", [JK, esmf:time_to_string(From)])),
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),
@@ -133,6 +131,7 @@ execute(J=#job_desc{key = JK, cfg=CfgOverw}) ->
 
 
 run_wps(J=#job_desc{cfg=Cfg}, Log) ->
+    logd:message("STAGE: running WPS", Log),
     WPSDir = plist:getp(wps_install_dir, Cfg),             % directory with an installation of WPS
     ExecDir = plist:getp(wps_exec_dir, Cfg),               % directory in which WPS step is supposed to run
     Vtable = plist:getp(vtable_file, Cfg),                 % Vtable file relative to WPS directory
@@ -208,6 +207,7 @@ run_wps(J=#job_desc{cfg=Cfg}, Log) ->
 
 
 prep_wrf(J=#job_desc{cfg=Cfg}, Log) ->
+    logd:message("STAGE: preparing WRF run", Log),
     WPSExecDir = plist:getp(wps_exec_dir, Cfg),
     WRFDir = filename:join(plist:getp(wrf_install_dir, Cfg), "run"),     % directory, which is setup to run WRF
     ExecDir = plist:getp(wrf_exec_dir, Cfg),                             % directory in which WPS step is supposed to run
@@ -234,7 +234,7 @@ prep_wrf(J=#job_desc{cfg=Cfg}, Log) ->
 					  [{in_dir, ExecDir}, {output_type, real_exe_output(BuildType, ExecDir)},
 					   {exit_check, {scan_for, "SUCCESS COMPLETE REAL_EM"}},
 					   {store_output_to, filename:join(ExecDir, "real.output")}]]},
-	     with_key = "real",
+	     with_key = real,
 	     what = [run_time]}
 	],
 	  
@@ -247,29 +247,34 @@ prep_wrf(J=#job_desc{cfg=Cfg}, Log) ->
     PL = plan_logger:start(Log),
     PID = plan_runner:execute_plan(Plan, [PL]),
     case plan_runner:wait_for_plan(PID) of
-	{success,_} ->
-	    run_wrf(ExecM, BuildT, J, Log);
+	{success, PlanInstr} ->
+	    NewInstr = plist:update_with(PlanInstr, plist:getp(instr, Cfg)),
+     	    run_wrf(ExecM, BuildT, J#job_desc{cfg=plist:setp(instr, NewInstr, Cfg)}, Log);
 	R ->
 	    job_failed(prepare_wrf, J, Log, R)
     end.
 
 
 run_wrf(immediate, no_mpi, J=#job_desc{cfg=Cfg}, Log) ->
+    logd:message("STAGE: running wrf.exe in serial mode", Log),
     Dir = plist:getp(wrf_exec_dir, Cfg),
+    Start = calendar:local_time(),
     R = tasks_exec:execute(filename:join(Dir, "wrf.exe"),
 			   [ {in_dir, Dir}, {output_type, stdout},
 			     {exit_check, {scan_for, "SUCCESS"}},
 			     {store_output_to, filename:join(Dir, "wrf.output")} ]),
+    RunTime = atime:dt_seconds_between(Start, calendar:local_time()),
     case R of
 	{success, _Msg} ->
-	    post_wrf(J, Log);
+	    NewInstr = plist:setp(wrf, [{run_time, RunTime}], plist:getp(instr, Cfg)),
+	    post_wrf(J#job_desc{cfg=plist:setp(instr, NewInstr, Cfg)}, Log);
 	_ ->
 	    job_failed(run_wrf, J, Log, R)
     end;
 
 run_wrf(immediate, with_mpi, J=#job_desc{cfg=Cfg}, Log) ->
 
-    logd:message("setting up immediate parallel run of WRF", Log),
+    logd:message("STAGE: setting up immediate parallel run of WRF", Log),
     
     % retrieve runtime parameters from configuration
     Dir = plist:getp(wrf_exec_dir, Cfg),
@@ -284,28 +289,33 @@ run_wrf(immediate, with_mpi, J=#job_desc{cfg=Cfg}, Log) ->
 
     logd:message("invoking mpiexec", Log),
 
-    Start = calendar:local_time(),
-
     % execute the mpiexec/mpirun command as per configuration
+    Start = calendar:local_time(),
     R = tasks_exec:execute(MPI,
 			   [{in_dir, Dir},
 			    {output_type, filename:join(Dir, "rsl.error.0000")},
 			    {exit_check, {scan_for, "SUCCESS"}},
 			    {op_args, [{args, ["--machinefile", "node_list", "-n", NP, "./wrf.exe"]}]},
 			    {store_output_to, filename:join(Dir, "wrf.output")}]),
+
+    RunTime = atime:dt_seconds_between(Start, calendar:local_time()),
     case R of
 	{success, _Msg} ->
-	    logd:message(io_lib:fwrite("mpiexec/WRF execution success after ~p seconds.", [atime:dt_seconds_between(Start, calendar:local_time())]), Log),
-	    prune_wrfouts(plist:getp(ncks_prune_wrfout, Cfg, no_pruning), J, Log);
+	    logd:message(io_lib:fwrite("mpiexec/WRF execution success after ~p seconds.", [RunTime]), Log),
+	    NewInstr = plist:setp(wrf, [{run_time, RunTime}], plist:getp(instr, Cfg)),
+	    prune_wrfouts(plist:getp(ncks_prune_wrfout, Cfg, no_pruning),
+			  J#job_desc{cfg=plist:setp(instr, NewInstr, Cfg)},
+			  Log);
 	_ ->
 	    job_failed(run_wrf, J, Log, R)
     end.
 
 
 prune_wrfouts(no_pruning, J, Log) ->
-    logd:message("no pruning requested, skipping stage"),
+    logd:message("no pruning requested, skipping stage", Log),
     post_wrf(J, Log);
 prune_wrfouts(Vars, J = #job_desc{cfg=Cfg}, Log) ->
+    logd:message("STAGE: pruning wrfout", Log),
     Dir = plist:getp(wrf_exec_dir, Cfg),
     NCKS = wrfx_db:get_conf(ncks_path),
     AbsFs = lists:map(fun (X) -> filename:join(Dir, X) end, filesys:list_dir_regexp(Dir, "wrfout.+")),

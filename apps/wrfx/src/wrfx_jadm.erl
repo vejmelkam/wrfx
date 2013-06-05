@@ -10,7 +10,7 @@
 %% ------------------------------------------------------------------
 
 -export([start_link/0]).
--export([active_jobs/0, run_job/1, schedule_job/1, cancel_job/1, get_job_pid/1]).
+-export([jobs/0, run_job/1, schedule_job/1, cancel_job/1, get_job_pid/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -28,16 +28,19 @@ start_link() ->
 
 
 %% @spec jobs(pid()) -> [pid()]
-active_jobs() ->
+jobs() ->
     gen_server:call(?SERVER, list_jobs).
+
 
 %% @spec add_job(J::job_desc()) -> success | failure.
 run_job(J=#job_desc{cfg=C}) ->
     C2 = plist:setp(schedule, now, C),
     gen_server:call(?SERVER, {schedule_job, J#job_desc{cfg=C2}}).
 
+
 schedule_job(J) ->
     gen_server:call(?SERVER, {schedule_job, J}).
+
     
 %% @spec remove_job(Jid::term()) -> success | failure.
 cancel_job(Jid) ->
@@ -47,6 +50,7 @@ cancel_job(Jid) ->
 	{failure, E} ->
 	    {failure, E}
     end.
+
 
 %% @spec get_job(Jid::term()) -> {success, pid()} | failure
 get_job_pid(Jid) ->

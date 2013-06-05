@@ -12,10 +12,14 @@
 
 -include_lib("jobs/include/jobs.hrl").
 -include_lib("flow/include/flow.hrl").
--export([check/1, execute/1]).
+-export([check/1, execute/1, test_job/0]).
 
 -define(DOMAIN, "mwest").
 -define(MWEST_DL_URL, "http://mesowest.utah.edu/cgi-bin/droman/meso_download_mesowest_ndb.cgi").
+
+
+test_job() ->
+    ok.
 
 
 %% @doc
@@ -30,7 +34,7 @@ check(_J=#job_desc{cfg=_C}) ->
 execute(J=#job_desc{cfg=Cfg}) ->
     [From, To, Ss] = plist:get_list([wrf_from, wrf_to, stations], Cfg),
 
-    JI = "moisture_job_" ++ format_time(element(1, From)),
+    JI = lists:flatten("moisture_job_" ++ format_time(element(1, From))),
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),
@@ -84,7 +88,6 @@ convert_to_obs(J=#job_desc{cfg=Cfg}, Log) ->
     end.
 
 
-
 run_moisture_code(J=#job_desc{key=JK, cfg=Cfg}, Log) ->
     store_output_files(J, Log),
     logd:close(Log),
@@ -103,7 +106,6 @@ run_moisture_code(J=#job_desc{key=JK, cfg=Cfg}, Log) ->
 		stor_dom = Dom,
 		log_stor_id = {Dom, LFName},
 		inst = plist:getp(instr, Cfg)}.
-
 
 
 job_failed(A, J=#job_desc{key=JK, cfg=Cfg}, Log, {failure, Err}) ->
@@ -137,7 +139,6 @@ store_output_files(#job_desc{cfg=Cfg}, Log)->
     LFName = lists:flatten(io_lib:format("~s.log", [JI])),
     PathLF = filename:join(wrfx_db:get_conf(workspace_root), LFName),
     wrfx_fstor:store({Dom, LFName}, PathLF).
-    
 
 
 format_time({Y,M,D}) ->
@@ -148,7 +149,7 @@ retrieve_xls_files(Ds, Ss) ->
     lists:map(fun retrieve_xls_file/1, [{X, Y} || X <- Ds, Y <- Ss]).
 
 retrieve_xls_file({{Y,M,D}, Code}) ->
-    Name = lists:flatten(io_lib:format("~s-~4..0B--~2..0B-~2..0B", [Code, Y, M, D])),
+    Name = lists:flatten(io_lib:format("~s-~4..0B--~2..0B-~2..0B.xls", [Code, Y, M, D])),
     MesoDom = ?DOMAIN ++ io_lib:format("~4..0B-~2..0B-~2..0B", [Y,M,D]),
     case wrfx_fstor:exists({MesoDom, Name}) of
 	{true, F} ->
@@ -159,7 +160,6 @@ retrieve_xls_file({{Y,M,D}, Code}) ->
 	    {success, F} = wrfx_fstor:store({MesoDom, Name}, "/tmp/wrfx-mwest-download"),
 	    F
     end.
-
 	    
     
 construct_params(Y, M, D, Code) ->
