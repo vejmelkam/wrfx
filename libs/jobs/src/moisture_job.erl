@@ -17,9 +17,16 @@
 -define(DOMAIN, "mwest").
 -define(MWEST_DL_URL, "http://mesowest.utah.edu/cgi-bin/droman/meso_download_mesowest_ndb.cgi").
 
+-compile(export_all).
+
 
 test_job() ->
-    ok.
+    Cfg = [ {from, {{2013,6,4}, {0,0,0}}},
+	    {to,   {{2013,6,5}, {0,0,0}}},
+	    {stations, ["ESPC2"]},
+	    {wrfout, "/home/mvejmelka/Projects/wrfx/stor/outputs/"} ],
+    J = #job_desc{key=test_moisture_job, cfg=Cfg},
+    execute(J).
 
 
 %% @doc
@@ -32,13 +39,13 @@ check(_J=#job_desc{cfg=_C}) ->
 
 
 execute(J=#job_desc{cfg=Cfg}) ->
-    [From, To, Ss] = plist:get_list([wrf_from, wrf_to, stations], Cfg),
+    [From, To, Ss] = plist:get_list([from, to, stations], Cfg),
 
     JI = lists:flatten("moisture_job_" ++ format_time(element(1, From))),
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),
-    Dir = filename:join(Wkspace, "moisture_exec_" ++ JI),
+    Dir = filename:join(Wkspace, "moisture_" ++ JI),
 
     Cfg2 = plist:update_with([{job_id, JI},
 			      {job_domain, "outputs/" ++ JI},
