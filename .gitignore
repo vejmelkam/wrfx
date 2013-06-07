@@ -9,3 +9,6 @@ libs/nl/data
 libs/nl/src/nllparser.erl
 *.html
 doc
+stor/
+workspace/
+db/
