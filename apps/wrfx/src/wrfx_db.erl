@@ -25,7 +25,7 @@ start() ->
     mnesia:create_schema([node()]),
     mnesia:start(),
     ensure_tables(),
-    mnesia:wait_for_tables([wrfx_cfg], 5000).
+    mnesia:wait_for_tables([wrfx_cfg, job_desc], 5000).
 
 %% @doc Stops mnesia.
 stop() ->
@@ -42,10 +42,10 @@ set_conf(K, V) ->
 %% @doc Stores the record in a table with the same name as the record.
 %% @spec store(R::tuple()) -> success | {failure, Reason}
 store(R) ->
-    wrap_dirty_fun(fun() -> mnesia:dirty_write(R) end).
+    wrap_transaction(fun() -> mnesia:write(R) end).
 
 delete(R) ->
-    wrap_dirty_fun(fun() -> mnesia:dirty_delete(R) end).
+    wrap_transaction(fun() -> mnesia:delete(R) end).
 
 lookup(R) ->
     lookup(R,2).
@@ -79,6 +79,14 @@ wrap_dirty_fun(F) ->
 	success
     catch
 	{'EXIT', {aborted, R}} ->
+	    {failure, R}
+    end.
+
+wrap_transaction(F) ->
+    case mnesia:transaction(F) of
+	{atomic, R} ->
+	    {success, R};
+	{aborted, R} ->
 	    {failure, R}
     end.
 	

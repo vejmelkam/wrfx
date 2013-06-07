@@ -2,7 +2,7 @@
 
 -module(filesys).
 -author("Martin Vejmelka <vejmelkam@gmail.com").
--export([list_dir_regexp/2, remove_directory/1]).
+-export([list_dir_regexp/2]).
 
 
 list_dir_regexp(Dir, RegExp) ->
@@ -19,16 +19,3 @@ is_match_re(X, MP) ->
 	    false
     end.
 
-
-remove_directory(D) ->
-    case file:list_dir(D) of
-	{ok, F} ->
-	    lists:foreach(fun (X) -> file:delete(filename:join(D, X)) end, F),
-	    file:del_dir(D);
-	{error, enoent} ->
-	    % if directory doesnt exist, it's just a no-op
-	    ok;
-	{error, E} ->
-	    {failure, E}
-    end.
-			   

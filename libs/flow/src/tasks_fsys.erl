@@ -6,11 +6,10 @@
 
 -module(tasks_fsys).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([dir_exists/1, file_exists/1,
-	 create_dir/1, create_symlink/2,
-	 write_file/2, delete_file/1,
-	 rename_file/2]).
-
+-export([dir_exists/1, create_dir/1, delete_dir/1]).
+-export([file_exists/1, write_file/2, delete_file/1, create_symlink/2,
+	 rename_file/2, delete_files_regexp/2]).
+-export([delete/1]).
 
 %% @doc Checks if a file exists (as a regular file) on the filesystem.
 %% Wraps {@link filelib:is_regular/1}.
@@ -45,6 +44,55 @@ create_dir(D) ->
     end.
 
 
+%% @doc Removes a file from the filesystem, wraps {@link file:delete/1}.
+%% @spec delete_file(F::string()) -> {success, string()}|{failure, string()}
+delete_file(F) ->
+    case file:delete(F) of
+	ok ->
+	    {success, io_lib:format("file [~s] deleted", [F])};
+	{error, enoent} ->
+	    {success, io_lib:format("file [~s] is non-existent, skipping", [F])};
+	{error, E} ->
+	    {failure, io_lib:format("failed to delete file ~s with error ~p", [F, E])}
+    end.
+
+
+%% @doc Remove a directory from the filesystem.  The directory need not be empty beforehand.
+%% @spec delete_dir(F::string()) -> {success, string()} | {failure, string()}
+delete_dir(F) ->
+    case file:list_dir(F) of
+	{ok, Fs} ->
+	    case lists:foldl(fun (X, {success, _}) -> delete(filename:join(F, X));
+				 (_X, {failure, E}) -> {failure, E} end, {success, []}, Fs) of
+		{success, _} ->
+		    case file:del_dir(F) of
+			ok ->
+			    {success, io_lib:format("directory ~s successfully removed", [F])};
+			{error, R} ->
+			    {failure, io_lib:format("failed to remove directory ~s with error ~p", [F, R])}
+		    end;
+		Failure ->
+		    Failure
+	    end;
+	{error, enoent} ->
+	    % if directory doesnt exist, it's just a no-op
+	    {success, io_lib:format("directory ~s did not exist", [F])};
+	{error, E} ->
+	    {failure, io_lib:format("failed to remove directory ~s with error ~p", [F, E])}
+    end.
+
+
+%% @doc Remove a file or a directory from the filesystem.  The directory need not be empty beforehand.
+%% @spec delete(F::string()) -> {success, string()} | {failure, string()}
+delete(F) ->
+    case filelib:is_dir(F) of
+	true ->
+	    delete_dir(F);
+	false ->
+	    delete_file(F)
+    end.
+
+
 %% @doc Creates a symlink to a file (file must exist).
 %% @spec create_symlink(F::string(), L::string()) -> {success, string()}|{failure, string()}
 create_symlink(F, L) ->
@@ -67,17 +115,6 @@ write_file(F, C) ->
     end.
 
 
-%% @doc Removes a file from the filesystem, wraps {@link file:delete/1}.
-%% @spec delete_file(F::string()) -> {success, string()}|{failure, string()}
-delete_file(F) ->
-    case file:delete(F) of
-	ok ->
-	    {success, io_lib:format("file [~s] deleted", [F])};
-	{error, enoent} ->
-	    {success, io_lib:format("file [~s] is non-existent, skipping", [F])};
-	{error, E} ->
-	    {failure, io_lib:format("error [~s] encountered while deleting file [~p]", [E, F])}
-    end.
 
 
 rename_file(Orig, New) ->
@@ -87,3 +124,12 @@ rename_file(Orig, New) ->
 	{error, R} ->
 	    {failure, io_lib:format("failed to rename [~s] to [~s] with error ~p", [Orig, New, R])}
     end.
+
+
+%% @doc Delete all files in directory D which conform to regular expression RE.
+%% @spec delete_files_regexp(D::string(), RE::string()) -> {success, []} | {error, Reason}
+delete_files_regexp(D, RE) ->
+    Fs = filesys:list_dir_regexp(D, RE),
+    lists:foldl(fun (X, {success, _}) -> delete_file(filename:join(D,X));
+		    (_X, {failure, R}) -> {failure, R} end, {success, []}, Fs).
+			 

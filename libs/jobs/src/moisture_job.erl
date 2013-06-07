@@ -15,7 +15,7 @@
 -export([check/1, execute/1, test_job/0]).
 
 -define(DOMAIN, "mwest").
--define(MWEST_DL_URL, "http://mesowest.utah.edu/cgi-bin/droman/meso_download_mesowest_ndb.cgi").
+-define(MWEST_DL_URL, "http://mesowest.utah.edu/cgi-bin/droman/meso_download_mesowest_ndb.cgi?").
 
 -compile(export_all).
 
@@ -45,7 +45,11 @@ execute(J=#job_desc{cfg=Cfg}) ->
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),
-    Dir = filename:join(Wkspace, "moisture_" ++ JI),
+    Dir = filename:join(Wkspace, JI),
+
+    % ensure workspace is empty
+    tasks_fsys:delete_dir(Dir),
+    tasks_fsys:create_dir(Dir),
 
     Cfg2 = plist:update_with([{job_id, JI},
 			      {job_domain, "outputs/" ++ JI},
@@ -53,51 +57,51 @@ execute(J=#job_desc{cfg=Cfg}) ->
 			      {started, calendar:local_time()},
 			      {instr, []}], Cfg),
 
-    Log = logd:open([stdio, filename:join(Dir, "moisture_job.log")]),
+    Log = logd:open([stdio, filename:join(Wkspace, "moisture_job.log")]),
 
     % retrieve all xls files from Mesowest (or from file cache)
     Fs = retrieve_xls_files(atime:dt_covering_days(From, To), Ss),
 
+    % construct the observation variance table (substitute for actual variance estimates)
+    Table = string:join(lists:map(fun ({V,Var}) -> V ++ ", " ++ Var end,
+				  plist:getp(obs_var_table, Cfg)), "\n") ++ "\n",
+
+    MCDir = filename:dirname(wrfx_db:get_conf(moisture_code_path)),
+
     Ts = [ {tasks_fsys, create_symlink, [F, filename:join(Dir, filename:basename(F))]}
-	   || F <- Fs ],
-    Plan = #plan{id=moisture_link_xls, tasks=Ts},
-    PL = plan_logger:start(Log),
-    PID = plan_runner:execute_plan(Plan, [PL]),
-    case plan_runner:wait_for_plan(PID) of
-	{success, _} ->
-	    convert_to_obs(J#job_desc{cfg=Cfg2}, Log);
-	R ->
-	    job_failed(get_mesowest_files, J#job_desc{cfg=Cfg2}, Log, R)
-    end.
-
-
-convert_to_obs(J=#job_desc{cfg=Cfg}, Log) ->
-    Table = plist:getp(obs_var_talbe, Cfg),
-    Dir = plist:getp(exec_dir, Cfg),
-    Ss = plist:getp(stations, Cfg),
-
-    Ts = [ {tasks_fsys, write_file, [filename:join(Dir, "obs_var_table"), Table]},
+	   || F <- Fs ] ++
+	 [ {tasks_fsys, write_file, [filename:join(Dir, "obs_var_table"), Table]},
 	   {tasks_fsys, write_file, [filename:join(Dir, "station_list"), string:join(Ss, "\n") ++ "\n"]},
-	   {tasks_exec, execute, ["deps/scraper/extract_observations.py",
+	   {tasks_fsys, write_file, [filename:join(MCDir, "rda.cfg"), make_config_file(Cfg2)]},
+	   {tasks_exec, execute, [wrfx_db:get_conf(scraper_path),
 				  [ {in_dir, Dir},
 				    {output_type, stdout},
 				    {op_args, [{args, ["station_list", "obs_var_table"]}]},
 				    {store_output_to, filename:join(Dir, "extract_observations.log")},
-				    {exit_check, exit_code}]]}],
-    Plan = #plan{id=xls_to_obs, tasks=Ts},
+				    {exit_check, exit_code}]]},
+	   {tasks_fsys, delete_files_regexp, [Dir, ".*\.xls"]},
+	   {tasks_exec, execute, [wrfx_db:get_conf(moisture_code_path),
+				  [ {in_dir, MCDir},
+				    {output_type, stdout},
+				    {op_args, [{args, ["rda.cfg"]}]},
+				    {store_output_to, filename:join(Dir, "moisture_code.log")},
+				    {exit_check, exit_code}]]},
+	   {tasks_exec, delete_files_regexp, [Dir, ".*\.obs"]} ],
+    
+    Plan = #plan{id=prep_moisture_run, tasks=Ts},
     PL = plan_logger:start(Log),
     PID = plan_runner:execute_plan(Plan, [PL]),
     case plan_runner:wait_for_plan(PID) of
 	{success, _} ->
-	    run_moisture_code(J, Log);
+	    post_moisture_run(J#job_desc{cfg=Cfg2}, Log);
 	R ->
-	    job_failed(xls_to_obs, J, Log, R)
+	    job_failed(prep_moisture_run, J#job_desc{cfg=Cfg2}, Log, R)
     end.
 
 
-run_moisture_code(J=#job_desc{key=JK, cfg=Cfg}, Log) ->
+post_moisture_run(J=#job_desc{key=JK, cfg=Cfg}, Log) ->
+
     store_output_files(J, Log),
-    logd:close(Log),
 
     JI = plist:getp(job_id, Cfg),
     Dom = plist:getp(job_domain, Cfg),
@@ -156,13 +160,14 @@ retrieve_xls_files(Ds, Ss) ->
     lists:map(fun retrieve_xls_file/1, [{X, Y} || X <- Ds, Y <- Ss]).
 
 retrieve_xls_file({{Y,M,D}, Code}) ->
-    Name = lists:flatten(io_lib:format("~s-~4..0B--~2..0B-~2..0B.xls", [Code, Y, M, D])),
-    MesoDom = ?DOMAIN ++ io_lib:format("~4..0B-~2..0B-~2..0B", [Y,M,D]),
+    Name = lists:flatten(io_lib:format("~s_~4..0B-~2..0B-~2..0B.xls", [Code, Y, M, D])),
+    MesoDom = ?DOMAIN ++ io_lib:format("/~4..0B-~2..0B-~2..0B", [Y,M,D]),
     case wrfx_fstor:exists({MesoDom, Name}) of
 	{true, F} ->
 	    F;
 	false ->
-	    URL = ?MWEST_DL_URL ++ construct_params(Y,M,D,Code),
+	    URL = lists:flatten([?MWEST_DL_URL, construct_params(Y,M,D,Code)]),
+	    io:format("querying ~p~n", [URL]),
 	    {success, _} = tasks_net:http_sync_get(URL, "/tmp/wrfx-mwest-download"),
 	    {success, F} = wrfx_fstor:store({MesoDom, Name}, "/tmp/wrfx-mwest-download"),
 	    F
@@ -170,17 +175,40 @@ retrieve_xls_file({{Y,M,D}, Code}) ->
 	    
     
 construct_params(Y, M, D, Code) ->
-    Pairs = lists:map( fun (I) -> io_lib:format("~s=~p", I) end,
+    Pairs = lists:map( fun (I) -> io_lib:format("~s=~s", I) end,
 		       [ ["product", "" ],
 			 ["stn", Code ],
 			 ["unit", "1"],
 			 ["time", "GMT"],
-			 ["day1", D],
-			 ["month1", io_lib:format("~2..0B", [M])],
-			 ["year1", Y],
+			 ["day1", integer_to_list(D)],
+			 ["month1", lists:flatten(io_lib:format("~2..0B", [M]))],
+			 ["year1", integer_to_list(Y)],
 			 ["hour1", "0"],
-			 ["hours", 24],
-			 ["daycalendar", 1],
+			 ["hours", "24"],
+			 ["daycalendar", "1"],
 			 ["output", "Excel"],
-			 ["order", "0"] ]),
+			 ["order", "0"],
+			 ["TMPF", "TMPF"],
+			 ["RELH", "RELH"],
+			 ["FM", "FM"],
+			 ["PREC", "PREC"],
+		         ["QFLG", "QFLG"] ]),
     string:join(Pairs, "&").
+
+
+make_config_file(Cfg) ->
+    Dir = plist:getp(exec_dir, Cfg),
+    QDir = "\"" ++ Dir ++ "\"",
+    Pairs = [ {"station_info_dir", QDir },
+	      {"station_data_dir", QDir },
+	      {"station_info", "\"station_list\""},
+	      {"output_dir", QDir},
+	      {"wrf_output", "\"" ++ plist:getp(wrfout, Cfg) ++ "\""},
+	      {"Q", "[2.0e-4, 1.0e-4, 5.0e-5, 0, 0, 0, 5.0e-5, 5.0e-5, 0]"},
+	      {"P0", "[0.01, 0.01, 0.01, 0, 0, 0, 0.01, 0.01, 0]"},
+	      {"covariates", "[:constant, :temperature, :pressure, :rain, :lon, :lat, :elevation]"},
+	      {"assimilation_time_window", "3600"} ],
+    PS = lists:map(fun ({X,Y}) -> io_lib:format("~p => ~s", [X, Y]) end, Pairs),
+    "[\n" ++ string:join(PS, ",\n") ++ "\n]\n".
+    
+		      

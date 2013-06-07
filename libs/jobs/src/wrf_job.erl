@@ -97,8 +97,8 @@ execute(J=#job_desc{key = JK, cfg=CfgOverw}) ->
     WRFExecDir = filename:join(Wkspace, "wrf_exec_" ++ JI),
 
     % ensure these workspaces are empty
-    filesys:remove_directory(WPSExecDir),
-    filesys:remove_directory(WRFExecDir),
+    tasks_fsys:delete_dir(WPSExecDir),
+    tasks_fsys:delete_dir(WRFExecDir),
 
     % retrieve GRIB files
     GribSrc = lists:nth(1, plist:getp(grib_sources, Cfg)),
@@ -342,8 +342,8 @@ post_wrf(J=#job_desc{key=JK, cfg=Cfg}, Log) ->
     LFName = lists:flatten(io_lib:format("~s.log", [JI])),
 
     % remove workspace directories
-    filesys:remove_directory(plist:getp(wps_exec_dir, Cfg)),
-    filesys:remove_directory(plist:getp(wrf_exec_dir, Cfg)),
+    tasks_fsys:remove_directory(plist:getp(wps_exec_dir, Cfg)),
+    tasks_fsys:remove_directory(plist:getp(wrf_exec_dir, Cfg)),
 
     % return a job report
     #job_report{job_id = plist:getp(job_id, Cfg),

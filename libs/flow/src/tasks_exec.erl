@@ -28,7 +28,6 @@ execute(Cmd, Opts) ->
     end.
 
 
-
 execute_capture_stdout(Cmd, InDir, Monitors, StoreFile, ExtraOP, ExitCheck) ->
     % starts file sink which copies stdout of program to desired storage
     FS = sink_file:start(StoreFile),
@@ -71,7 +70,7 @@ wait_for_completion(XPID) ->
 evaluate_result(exit_code, 0, _F, Cmd) ->
     {success, io_lib:format("success executing ~s", [Cmd])};
 evaluate_result(exit_code, C, _F, Cmd) ->
-    {failure, io_lib:format("execution of ~s failed with exit code ~s", [Cmd, C])};
+    {failure, io_lib:format("execution of ~s failed with exit code ~p", [Cmd, C])};
 evaluate_result({scan_for, S}, C, F, Cmd) ->
     case scan_file(S, F) of
 	found ->

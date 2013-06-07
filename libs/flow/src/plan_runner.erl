@@ -72,7 +72,7 @@ wait_and_check_messages(PID, Rest, Monitors, Inst) ->
 	{async_task_done, PID, TaskInstr, {success, Text}} ->
 	    msg_router:multicast({self(), task_done, Text}, Monitors),
 	    execute_plan_internal(Rest, Monitors, update_plan_instr(TaskInstr, Inst));
-	{async_task_done, PID, TaskInstr, {failure, Error}} ->
+	{async_task_done, PID, _TaskInstr, {failure, Error}} ->
 	    msg_router:multicast({self(), failure, Error}, Monitors),
 	    {failure, Error};
 	{ping, From} ->
