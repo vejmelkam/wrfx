@@ -1,5 +1,4 @@
 
-
 %% @doc
 %% This moisture job runs on a given wrfout file.
 %% It first generates a list of xls files that are necessary to run the job.
@@ -14,8 +13,11 @@
 -include_lib("flow/include/flow.hrl").
 -export([check/1, execute/1, test_job/0]).
 
+-compile(export_all).
+
 -define(DOMAIN, "mwest").
 -define(MWEST_DL_URL, "http://mesowest.utah.edu/cgi-bin/droman/meso_download_mesowest_ndb.cgi?").
+-define(MWEST_INFO_URL, "http://mesowest.utah.edu/cgi-bin/droman/side_mesowest.cgi?stn=").
 
 -compile(export_all).
 
@@ -32,7 +34,7 @@ test_job() ->
 %% @doc
 %% Checks whether the configuration structure is valid for wrf_job and makes
 %% a best-effort check if this job will be executable.
-%% @spec check_config(C::plist()) -> {success, []}|{failure, Reason}
+%% @spec check(C::plist()) -> {success, []}|{failure, Reason}
 %%
 check(_J=#job_desc{cfg=_C}) ->
     {success, "configuration check success"}.
@@ -60,7 +62,9 @@ execute(J=#job_desc{cfg=Cfg}) ->
     Log = logd:open([stdio, filename:join(Wkspace, "moisture_job.log")]),
 
     % retrieve all xls files from Mesowest (or from file cache)
-    Fs = retrieve_xls_files(atime:dt_covering_days(From, To), Ss),
+    Ds = atime:dt_covering_days(From, To),
+    Is = retrieve_info_files(Ss),
+    Fs = retrieve_xls_files(Ds, Ss),
 
     % construct the observation variance table (substitute for actual variance estimates)
     Table = string:join(lists:map(fun ({V,Var}) -> V ++ ", " ++ Var end,
@@ -68,8 +72,8 @@ execute(J=#job_desc{cfg=Cfg}) ->
 
     MCDir = filename:dirname(wrfx_db:get_conf(moisture_code_path)),
 
-    Ts = [ {tasks_fsys, create_symlink, [F, filename:join(Dir, filename:basename(F))]}
-	   || F <- Fs ] ++
+    Ts = [ {tasks_fsys, create_symlink, [F, filename:join(Dir, filename:basename(F))]} || F <- Fs ] ++
+	 [ {tasks_fsys, create_symlink, [F, filename:join(Dir, filename:basename(F))]} || F <- Is ] ++
 	 [ {tasks_fsys, write_file, [filename:join(Dir, "obs_var_table"), Table]},
 	   {tasks_fsys, write_file, [filename:join(Dir, "station_list"), string:join(Ss, "\n") ++ "\n"]},
 	   {tasks_fsys, write_file, [filename:join(MCDir, "rda.cfg"), make_config_file(Cfg2)]},
@@ -167,7 +171,6 @@ retrieve_xls_file({{Y,M,D}, Code}) ->
 	    F;
 	false ->
 	    URL = lists:flatten([?MWEST_DL_URL, construct_params(Y,M,D,Code)]),
-	    io:format("querying ~p~n", [URL]),
 	    {success, _} = tasks_net:http_sync_get(URL, "/tmp/wrfx-mwest-download"),
 	    {success, F} = wrfx_fstor:store({MesoDom, Name}, "/tmp/wrfx-mwest-download"),
 	    F
@@ -212,3 +215,42 @@ make_config_file(Cfg) ->
     "[\n" ++ string:join(PS, ",\n") ++ "\n]\n".
     
 		      
+retrieve_info_files(Ss) ->
+    lists:map(fun retrieve_info_file/1, Ss).
+
+retrieve_info_file(Code) ->
+    Name = Code ++ ".info",
+    MesoDom = ?DOMAIN ++ "/info",
+    case wrfx_fstor:exists({MesoDom, Name}) of
+	{true, F} ->
+	    F;
+	false ->
+	    {success, _Msg, Bdy} = tasks_net:http_sync_get(?MWEST_INFO_URL ++ Code),
+	    io:format("~p~n", [Bdy]),
+	    Vals = extract_values_from_body(Bdy, [<<"NAME:">>, <<"LATTITUDE:">>, <<"LONGITUDE:">>, <<"ELEVATION:">>], []),
+	    file:write_file("/tmp/info_file", string:join([Code|Vals], "\n")),
+	    {success, F} = wrfx_fstor:store({MesoDom, Name}, "/tmp/info_file"),
+	    F
+    end.
+	    
+	    
+extract_values_from_body(Bdy, [V|Vs], C) ->
+    [Line, Rest] = binary:split(Bdy, <<"<br />">>),
+    case binary:split(Line, V) of
+	[_Prefix, Value] ->
+	    % somewhat cumbersome but remove spaces and eols from string
+	    Val = extract_value(V, string:strip(string:strip(binary_to_list(Value)), both, $\n)),
+	    extract_values_from_body(Rest, Vs, [Val|C]);
+	[_NoSplit] ->
+	    extract_values_from_body(Rest, [V|Vs], C)
+    end.
+
+
+extract_value(<<"ELEVATION:">>, Val) ->
+    [Num, _Ft] = string:tokens(Val, " "),
+    io_lib:format("~p", [list_to_integer(Num) * 0.3048]);
+extract_value(_V, Val) ->
+    Val.
+
+
+

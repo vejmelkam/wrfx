@@ -11,7 +11,7 @@
 %% @doc
 %% Checks whether the configuration structure is valid for wrf_job and makes
 %% a best-effort check if this job will be executable.
-%% @spec check_config(C::plist()) -> {success, []}|{failure, Reason}
+%% @spec check(C::plist()) -> {success, []}|{failure, Reason}
 %%
 check(#job_desc{cfg=C}) ->
     WRFId = plist:getp(wrf_id, C),

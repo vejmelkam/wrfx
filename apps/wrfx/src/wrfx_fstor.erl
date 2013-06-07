@@ -30,19 +30,19 @@ start_link() ->
 
 %% @type id() = {string(), string()}
 
-%% @spec file_store(ID::id(), File::string()) -> {success, Path} | {failure, Reason}
+%% @spec store(ID::id(), File::string()) -> {success, Path} | {failure, Reason}
 store(ID, File) ->
     gen_server:call(?SERVER, {file_store, ID, File}).
 
-%% @spec file_resolve(ID::id()) -> string()
+%% @spec resolve(ID::id()) -> string()
 resolve(ID) -> 
     gen_server:call(?SERVER, {file_resolve, ID}).
 
-%% @spec file_exists(ID::id()) -> {true, F} | false
+%% @spec exists(ID::id()) -> {true, F} | false
 exists(ID) ->
     gen_server:call(?SERVER, {file_exists, ID}).
 
-%% @spec file_remove(ID::id()) -> success | {failure, R}
+%% @spec remove(ID::id()) -> success | {failure, R}
 remove(ID) ->
     gen_server:call(?SERVER, {file_remove, ID}).
 

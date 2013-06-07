@@ -10,7 +10,7 @@
 %% ------------------------------------------------------------------
 
 -export([start_link/0]).
--export([jobs/0, run_job/1, schedule_job/1, cancel_job/1, get_job_pid/1]).
+-export([jobs/0, job_stats/0, run_job/1, schedule_job/1, cancel_job/1, get_scheduler/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -27,24 +27,35 @@ start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 
-%% @spec jobs(pid()) -> [pid()]
+%% @spec jobs() -> [pid()]
+%% @doc lists all jobs loaded into the job admin.  note: not all jobs are running
 jobs() ->
     gen_server:call(?SERVER, list_jobs).
 
 
-%% @spec add_job(J::job_desc()) -> success | failure.
+%% @spec job_stats() -> [job_activity()]
+%% @doc queries and reports the activity of all jobs registered with jadm.
+job_stats() ->
+    gen_server:call(?SERVER, job_stats).
+
+
+%% @spec run_job(J::job_desc()) -> success | failure
+%% @doc run a job now --- sets schedule to now to ensure scheduler executes job right away
 run_job(J=#job_desc{cfg=C}) ->
     C2 = plist:setp(schedule, now, C),
     gen_server:call(?SERVER, {schedule_job, J#job_desc{cfg=C2}}).
 
 
+%% @spec schedule_job(J::job_desc()) -> ok
+%% @doc schedules the job, the job is run at the time specified by the schedule config.
 schedule_job(J) ->
     gen_server:call(?SERVER, {schedule_job, J}).
 
-    
-%% @spec remove_job(Jid::term()) -> success | failure.
+
+%% @spec cancel_job(Jid::term()) -> success | failure
+%% @doc removes a job from scheduling, note that if a job is running, it is not killed.
 cancel_job(Jid) ->
-    case get_job_pid(Jid) of
+    case get_scheduler(Jid) of
 	{success, PID} ->
 	    gen_server:call(?SERVER, {cancel_job, PID});
 	{failure, E} ->
@@ -52,9 +63,10 @@ cancel_job(Jid) ->
     end.
 
 
-%% @spec get_job(Jid::term()) -> {success, pid()} | failure
-get_job_pid(Jid) ->
-    gen_server:call(?SERVER, {get_job_pid, Jid}).
+%% @spec get_scheduler(Jid::term()) -> {success, pid()} | failure
+%% @doc retrieves the PID of the scheduler that is running the job Jid.
+get_scheduler(Jid) ->
+    gen_server:call(?SERVER, {get_pid_for_jid, Jid}).
     
 
 %% ------------------------------------------------------------------
@@ -70,6 +82,9 @@ init(_Args) ->
 handle_call(list_jobs, _From, Infos) ->
     {reply, plist:keys(Infos), Infos};
 
+handle_call(job_stats, _From, Infos) ->
+    {reply, lists:map(fun ({_Jid,PID}) -> sched:status(PID) end, Infos), Infos};
+
 handle_call({schedule_job, J}, _From, Infos) ->
     Info = start_job(J),
     {reply, ok, [Info|Infos]};
@@ -79,7 +94,7 @@ handle_call({remove_job, Jid}, _From, Infos) ->
     success = sched:stop(PID),
     {reply, success, plist:remove_key(Jid, Infos)};
 
-handle_call({get_job_pid, Jid}, _From, Infos) ->
+handle_call({get_pid_for_jid, Jid}, _From, Infos) ->
     case plist:getp(Jid, Infos, not_found) of
 	not_found ->
 	    {reply, {failure, not_found}, Infos};

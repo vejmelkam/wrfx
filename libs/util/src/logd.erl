@@ -13,7 +13,7 @@
 
 %% @doc Starts a logger that logs to the targets given in a list.
 %% A target is either stdio or a filename string.
-%% @spec start([stdio|string()]) -> pid()
+%% @spec open([stdio|string()]) -> pid()
 open(Ts) ->
     Devs = lists:map(fun open_target/1, Ts),
     spawn(fun () -> logd_msg_loop(Devs) end).
@@ -25,7 +25,7 @@ close(PID) ->
     ok.
 
 %% @doc Sends a message to the logger, which is routed to all targets.
-%% @spec message(string(), pid()) -> ok.
+%% @spec message(string(), pid()) -> ok
 message(M, PID) ->
     PID ! {self(), msg, M},
     ok.
