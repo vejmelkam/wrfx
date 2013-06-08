@@ -18,6 +18,7 @@
 -define(DOMAIN, "mwest").
 -define(MWEST_DL_URL, "http://mesowest.utah.edu/cgi-bin/droman/meso_download_mesowest_ndb.cgi?").
 -define(MWEST_INFO_URL, "http://mesowest.utah.edu/cgi-bin/droman/side_mesowest.cgi?stn=").
+-define(MWEST_VARS_URL, "http://mesowest.utah.edu/cgi-bin/droman/download_ndb.cgi?stn=").
 
 -compile(export_all).
 
@@ -63,7 +64,7 @@ execute(J=#job_desc{cfg=Cfg}) ->
 
     % retrieve all xls files from Mesowest (or from file cache)
     Ds = atime:dt_covering_days(From, To),
-    Is = retrieve_info_files(Ss),
+    Is = retrieve_infos(Ss),
     Fs = retrieve_xls_files(Ds, Ss),
 
     % construct the observation variance table (substitute for actual variance estimates)
@@ -84,20 +85,26 @@ execute(J=#job_desc{cfg=Cfg}) ->
 				    {store_output_to, filename:join(Dir, "extract_observations.log")},
 				    {exit_check, exit_code}]]},
 	   {tasks_fsys, delete_files_regexp, [Dir, ".*\.xls"]},
-	   {tasks_exec, execute, [wrfx_db:get_conf(moisture_code_path),
-				  [ {in_dir, MCDir},
-				    {output_type, stdout},
-				    {op_args, [{args, ["rda.cfg"]}]},
-				    {store_output_to, filename:join(Dir, "moisture_code.log")},
-				    {exit_check, exit_code}]]},
-	   {tasks_exec, delete_files_regexp, [Dir, ".*\.obs"]} ],
+	   #instr_task{
+	      mfa = {tasks_exec, execute, [wrfx_db:get_conf(moisture_code_path),
+					   [ {in_dir, MCDir},
+					     {output_type, stdout},
+					     {op_args, [{args, ["rda.cfg"]}]},
+					     {store_output_to, filename:join(Dir, "moisture_code.log")},
+					     {exit_check, exit_code}]]},
+	      with_key = moisture,
+	      what = [run_time]},
+	   {tasks_fsys, delete_files_regexp, [Dir, ".*\.obs"]},
+	   {tasks_fsys, delete_files_regexp, [Dir, ".*\.info"]}
+	 ],
     
     Plan = #plan{id=prep_moisture_run, tasks=Ts},
     PL = plan_logger:start(Log),
     PID = plan_runner:execute_plan(Plan, [PL]),
     case plan_runner:wait_for_plan(PID) of
-	{success, _} ->
-	    post_moisture_run(J#job_desc{cfg=Cfg2}, Log);
+	{success, PlanInstr} ->
+	    NewInstr = plist:update_with(PlanInstr, plist:getp(instr, Cfg2)),
+     	    post_moisture_run(J#job_desc{cfg=plist:setp(instr, NewInstr, Cfg2)}, Log);
 	R ->
 	    job_failed(prep_moisture_run, J#job_desc{cfg=Cfg2}, Log, R)
     end.
@@ -147,11 +154,29 @@ job_failed(A, J=#job_desc{key=JK, cfg=Cfg}, Log, {failure, Err}) ->
 
 	    
 store_output_files(#job_desc{cfg=Cfg}, Log)->
-    % close log and move it to storage
-    logd:close(Log),
+
+    Dir = plist:getp(exec_dir, Cfg),
     JI = plist:getp(job_id, Cfg),
     Dom = plist:getp(job_domain, Cfg),
     LFName = lists:flatten(io_lib:format("~s.log", [JI])),
+
+    T1 = [ {wrfx_fstor, store, [{Dom, X}, filename:join(Dir, X)]} ||
+	    X <- filesys:list_dir_regexp(Dir, "wrfout.+") ],
+    T2 = [ {wrfx_fstor, store, [{Dom, X}, filename:join(Dir, X)]} ||
+	    X <- filesys:list_dir_regexp(Dir, "frame.+") ],
+
+    Plan = #plan{id = post_moisture_plan, tasks = lists:append([T1,T2])},
+    PL = plan_logger:start(Log),
+    PID = plan_runner:execute_plan(Plan, [PL]),
+    case plan_runner:wait_for_plan(PID) of
+	{success, _T} ->
+	    logd:message(io_lib:format("output files moved to ~s", [Dom]), Log);
+	{failure, E} ->
+	    logd:message(io_lib:format("failed to move all files with error ~s", [E]), Log)
+    end,
+    
+    % close log and move it to storage
+    logd:close(Log),
     PathLF = filename:join(wrfx_db:get_conf(workspace_root), LFName),
     wrfx_fstor:store({Dom, LFName}, PathLF).
 
@@ -171,7 +196,7 @@ retrieve_xls_file({{Y,M,D}, Code}) ->
 	    F;
 	false ->
 	    URL = lists:flatten([?MWEST_DL_URL, construct_params(Y,M,D,Code)]),
-	    {success, _} = tasks_net:http_sync_get(URL, "/tmp/wrfx-mwest-download"),
+	    {success, _} = tasks_net:http_sync_get_stream(URL, "/tmp/wrfx-mwest-download"),
 	    {success, F} = wrfx_fstor:store({MesoDom, Name}, "/tmp/wrfx-mwest-download"),
 	    F
     end.
@@ -215,42 +240,95 @@ make_config_file(Cfg) ->
     "[\n" ++ string:join(PS, ",\n") ++ "\n]\n".
     
 		      
-retrieve_info_files(Ss) ->
-    lists:map(fun retrieve_info_file/1, Ss).
+retrieve_infos(Ss) ->
+    lists:map(fun retrieve_info/1, Ss).
 
-retrieve_info_file(Code) ->
+retrieve_info(Code) ->
     Name = Code ++ ".info",
     MesoDom = ?DOMAIN ++ "/info",
     case wrfx_fstor:exists({MesoDom, Name}) of
 	{true, F} ->
 	    F;
 	false ->
-	    {success, _Msg, Bdy} = tasks_net:http_sync_get(?MWEST_INFO_URL ++ Code),
-	    io:format("~p~n", [Bdy]),
-	    Vals = extract_values_from_body(Bdy, [<<"NAME:">>, <<"LATTITUDE:">>, <<"LONGITUDE:">>, <<"ELEVATION:">>], []),
-	    file:write_file("/tmp/info_file", string:join([Code|Vals], "\n")),
+	    ok = download_and_store_info(Code),
 	    {success, F} = wrfx_fstor:store({MesoDom, Name}, "/tmp/info_file"),
 	    F
     end.
-	    
-	    
-extract_values_from_body(Bdy, [V|Vs], C) ->
-    [Line, Rest] = binary:split(Bdy, <<"<br />">>),
-    case binary:split(Line, V) of
-	[_Prefix, Value] ->
-	    % somewhat cumbersome but remove spaces and eols from string
-	    Val = extract_value(V, string:strip(string:strip(binary_to_list(Value)), both, $\n)),
-	    extract_values_from_body(Rest, Vs, [Val|C]);
-	[_NoSplit] ->
-	    extract_values_from_body(Rest, [V|Vs], C)
+
+
+download_and_store_info(Code) ->
+    InfoList = extract_info(download_and_parse(?MWEST_INFO_URL ++ Code)),
+    Vars = get_variables(download_and_parse(?MWEST_VARS_URL ++ Code)),
+    write_info_file("/tmp/info_file", Code, Vars, InfoList),
+    ok.
+
+
+extract_info(T) ->
+    A = mochiweb_xpath:execute("//div/font/b/text()", T),
+    lists:flatten(lists:foldl(fun (X,Acc) -> [extract_pair(X)|Acc] end, [], A)).
+
+
+extract_pair(X) ->
+    Xt = trim_whitespace(X),
+    case string:tokens(Xt, ":") of
+	[K, V] ->
+	    process_station_info(string:strip(K), string:strip(V));
+	_Str ->
+	    []
     end.
 
 
-extract_value(<<"ELEVATION:">>, Val) ->
+process_station_info(K="ELEVATION", Val) ->
     [Num, _Ft] = string:tokens(Val, " "),
-    io_lib:format("~p", [list_to_integer(Num) * 0.3048]);
-extract_value(_V, Val) ->
-    Val.
+    {K, lists:flatten(io_lib:format("~p", [list_to_integer(Num) * 0.3048]))};
+process_station_info(K, V) ->
+    {K, V}.
 
 
+trim_whitespace(Input) ->
+    LS = re:replace(Input, "^\\s*", "", [{return, list}]),
+    RS = re:replace(LS, "\\s*$", "", [{return, list}]),
+    RS.
+
+
+download_and_parse(URL) ->
+    {success, _M1, Bdy} = tasks_net:http_sync_get(URL),
+    mochiweb_html:parse(Bdy).
+
+
+write_info_file(F, Code, Vars, List) ->
+    {ok, D} = file:open(F, [write]),
+
+    file:write(D, "# info file constructed by WRFx\n"),
+    file:write(D, "# station code\n"),
+    file:write(D, Code),
+    file:write(D, "\n"),
+    file:write(D, "# station name\n"),
+    file:write(D, plist:getp("NAME", List)),
+    file:write(D, "\n"),
+    file:write(D, "# geographical position\n"),
+    file:write(D, plist:getp("LATITUDE", List)),
+    file:write(D, ", "),
+    file:write(D, plist:getp("LONGITUDE", List)),
+    file:write(D, "\n"),
+    file:write(D, "# elevation (meters)\n"),
+    file:write(D, plist:getp("ELEVATION", List)),
+    file:write(D, "\n"),
+    file:write(D, "# observed quantities\n"),
+    file:write(D, Vars),
+    file:write(D, "\n"),
+    file:close(D).
+
+get_variables(T) ->
+    Vs = mochiweb_xpath:execute("//input[@type='checkbox']/@value", T),
+    Vs2 = lists:map(fun binary_to_list/1, Vs),
+    Vs3 = lists:map(fun replace_var/1, Vs2),
+    string:join(Vs3, ", ").
+
+replace_var("TMPF") ->
+    "TMP";
+replace_var("DWPF") ->
+    "DWP";
+replace_var(Name) ->
+    Name.
 

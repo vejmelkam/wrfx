@@ -22,9 +22,11 @@ http_sync_get_stream(URL, Tgt) ->
 http_sync_get(URL) ->
     case httpc:request(get, {URL, []}, [], [{body_format, binary}]) of
 	{ok, {{_Ver, 200, _Reason}, _Hdrs, Bdy}} ->
-	    {success, io_lib:format("http get ~s success", [URL]), Bdy};
+	    Msg = io_lib:format("http get ~s success", [URL]),
+	    {success, lists:flatten(Msg), Bdy};
 	{ok, {{_Ver, 200, _Reason}, Bdy}} ->
-	    {success, io_lib:format("http get ~s success", [URL]), Bdy};
+	    Msg = io_lib:format("http get ~s success", [URL]),
+	    {success, lists:flatten(Msg), Bdy};
 	{ok, {{_Ver, Code, Reason}, _Bdy}} ->
 	    {failure, io_lib:format("http get ~s failed, server returned ~p with reason ~p", [URL, Code, Reason])};
 	{error, R} ->

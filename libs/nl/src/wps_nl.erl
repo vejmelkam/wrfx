@@ -24,7 +24,6 @@ read_config(NL) ->
 
 
 read_share(Sh, P) ->
-
     TS = esmf:parse_time(lists:nth(1, nlist:entry("start_date", Sh))),
     TE = esmf:parse_time(lists:nth(1, nlist:entry("end_date", Sh))),
     IS = lists:nth(1, nlist:entry("interval_seconds", Sh)),
@@ -33,7 +32,8 @@ read_share(Sh, P) ->
 
 
 write_config(Cfg, NL) ->
-    write_share(Cfg, NL).
+    NL2 = write_share(Cfg, NL),
+    write_geogrid(Cfg, NL2).
 
 
 write_share(Cfg, NL) ->
@@ -51,6 +51,13 @@ write_share(Cfg, NL) ->
 			  Sh),
 
     nllist:set_namelist("share", Sh2, NL).
+
+
+write_geogrid(Cfg, NL) ->
+    G = plist:getp(geog_root, Cfg),
+    Gg = nllist:namelist("geogrid", NL),
+    Gg2 = update_namelist([{"geog_data_path", G}], Gg),
+    nllist:set_namelist("geogrid", Gg2, NL).
     
 
 update_namelist(UP, NL) ->

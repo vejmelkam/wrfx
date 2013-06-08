@@ -16,7 +16,8 @@
 check(#job_desc{cfg=C}) ->
     WRFId = plist:getp(wrf_id, C),
     Ts = [ {tasks_verify, config_exists, [WRFId]},
-	   {tasks_verify, conditional_check, [ncks_prune_wrfout, { tasks_verify, config_exists, [ncks_path] }, C]} ],
+	   {tasks_verify, conditional_check,
+	    [ncks_prune_wrfout, { tasks_verify, config_exists, [ncks_path] }, C]} ],
     PID = plan_runner:execute_plan(#plan{id=wrf_job_check, tasks=Ts}, []),
     case plan_runner:wait_for_plan(PID) of
 	{success, _} ->
@@ -29,10 +30,11 @@ check(#job_desc{cfg=C}) ->
 
 check_config(no_mpi, C) ->
     Ts = [ {tasks_verify, check_keys,
-	    [ [wrf_id, wps_id, wrf_exec_method, wps_nl_template_id,
+	    [ [wrf_id, wps_id, wrf_exec_method, wps_nl_template_id, geog_root,
 	       wrf_nl_template_id, grib_sources, schedule], C ]},
 	   {tasks_verify, namelist_exists, [plist:getp(wps_nl_template_id, C)]},
 	   {tasks_verify, namelist_exists, [plist:getp(wrf_nl_template_id, C)]},
+	   {tasks_verify, config_exists, [plist:getp(geog_root, C)]},
 	   {tasks_verify, config_exists, [plist:getp(wps_id, C)]} ],
 
     PID = plan_runner:execute_plan(#plan{id=wrf_serial_job_check, tasks=Ts}, []),
@@ -41,11 +43,12 @@ check_config(no_mpi, C) ->
 
 check_config(with_mpi, C) ->
     Ts = [ {tasks_verify, check_keys,
-	    [ [wrf_id, wps_id, wrf_exec_method, wps_nl_template_id,
+	    [ [wrf_id, wps_id, wrf_exec_method, wps_nl_template_id, geog_root,
 	       wrf_nl_template_id, grib_sources, schedule, mpi_exec_name,
 	       mpi_nprocs, mpi_nodes], C ]},
 	   {tasks_verify, namelist_exists, [plist:getp(wps_nl_template_id, C)]},
 	   {tasks_verify, namelist_exists, [plist:getp(wrf_nl_template_id, C)]},
+	   {tasks_verify, config_exists, [plist:getp(geog_root, C)]},
 	   {tasks_verify, config_exists, [plist:getp(wps_id, C)]} ],
 
     PID = plan_runner:execute_plan(#plan{id=wrf_mpi_job_check, tasks=Ts}, []),
