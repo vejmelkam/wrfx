@@ -34,7 +34,7 @@ check_config(no_mpi, C) ->
 	       wrf_nl_template_id, grib_sources, schedule], C ]},
 	   {tasks_verify, namelist_exists, [plist:getp(wps_nl_template_id, C)]},
 	   {tasks_verify, namelist_exists, [plist:getp(wrf_nl_template_id, C)]},
-	   {tasks_verify, config_exists, [plist:getp(geog_root, C)]},
+	   {tasks_verify, config_exists, [plist:getp(geog_root_id, C)]},
 	   {tasks_verify, config_exists, [plist:getp(wps_id, C)]} ],
 
     PID = plan_runner:execute_plan(#plan{id=wrf_serial_job_check, tasks=Ts}, []),
@@ -48,7 +48,7 @@ check_config(with_mpi, C) ->
 	       mpi_nprocs, mpi_nodes], C ]},
 	   {tasks_verify, namelist_exists, [plist:getp(wps_nl_template_id, C)]},
 	   {tasks_verify, namelist_exists, [plist:getp(wrf_nl_template_id, C)]},
-	   {tasks_verify, config_exists, [plist:getp(geog_root, C)]},
+	   {tasks_verify, config_exists, [plist:getp(geog_root_id, C)]},
 	   {tasks_verify, config_exists, [plist:getp(wps_id, C)]} ],
 
     PID = plan_runner:execute_plan(#plan{id=wrf_mpi_job_check, tasks=Ts}, []),
@@ -114,6 +114,7 @@ execute(J=#job_desc{key = JK, cfg=CfgOverw}) ->
 			      {wrf_to, To},
 			      {wps_from, CovFrom},
 			      {wps_to, CovTo},
+			      {geog_root, wrfx_db:get_conf(plist:getp(geog_root_id, Cfg))},
 			      {vtable_file, VtableFile},
 			      {wps_exec_dir, WPSExecDir},
 			      {wrf_exec_dir, WRFExecDir},
@@ -345,8 +346,8 @@ post_wrf(J=#job_desc{key=JK, cfg=Cfg}, Log) ->
     LFName = lists:flatten(io_lib:format("~s.log", [JI])),
 
     % remove workspace directories
-    tasks_fsys:remove_directory(plist:getp(wps_exec_dir, Cfg)),
-    tasks_fsys:remove_directory(plist:getp(wrf_exec_dir, Cfg)),
+    tasks_fsys:delete_dir(plist:getp(wps_exec_dir, Cfg)),
+    tasks_fsys:delete_dir(plist:getp(wrf_exec_dir, Cfg)),
 
     % return a job report
     #job_report{job_id = plist:getp(job_id, Cfg),
@@ -441,7 +442,7 @@ retrieve_grib_files(_Dom, _URL, [], List) ->
 retrieve_grib_files(Dom, URLBase, [Name|Names], List) ->
     case wrfx_fstor:exists({Dom, Name}) of
 	false ->
-	    {success, _} = tasks_net:http_sync_get(URLBase ++ Name, "/tmp/wrfx-download"),
+	    {success, _} = tasks_net:http_sync_get_stream(URLBase ++ Name, "/tmp/wrfx-download"),
 	    {success, F} = wrfx_fstor:store({Dom, Name}, "/tmp/wrfx-download"),
 	    retrieve_grib_files(Dom, URLBase, Names, [F|List]);
 	{true, F} ->

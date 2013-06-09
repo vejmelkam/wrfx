@@ -11,7 +11,7 @@ wrfx_db:set_conf(ncks_path, "/opt/lib/bin/ncks").
 % store the operational forecast job
 C = [ {wrf_id, wrf_34_mpi},
       {wps_id, default_wps},
-      {geog_root, default_geog_root},
+      {geog_root_id, default_geog_root},
       {wrf_exec_method, immediate},
       {wps_nl_template_id, colorado_2km_1d_wps_nl},
       {wrf_nl_template_id, colorado_2km_1d_wrf_nl},
@@ -33,7 +33,7 @@ wrfx_db:store({job_desc, colorado_2km_op_wrf_48hr_run, C}).
 
 Ct = [ {wrf_id, wrf_34_mpi},
        {wps_id, default_wps},
-       {geog_root, default_geog_root},
+       {geog_root_id, default_geog_root},
        {wrf_exec_method, immediate},
        {wps_nl_template_id, colorado_8km_1d_wps_nl},
        {wrf_nl_template_id, colorado_8km_1d_wrf_nl},
