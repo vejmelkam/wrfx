@@ -11,6 +11,7 @@ import numpy as np
 #import riak
 
 def render_to_png(fig, data, caxis, filename):
+    fig.clf()
     fig.figimage(data, alpha=0.3, vmin=caxis[0], vmax=caxis[1])
     fig.savefig(filename)
 
@@ -23,12 +24,18 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--vars', metavar='V', type=str, dest='varlst', default=None, help='variables to extract, default: T2,PSFC,RAINC,RAINNC')
     args = parser.parse_args()
 
-    varlst = args.varlst or 'T2,PSFC,Q2'
+    varlst = args.varlst or 'T2,PSFC,Q2,RAINC,RAINNC'
     varlst = string.split(varlst, ',')
-    print("Processing variables %s" % str(varlst))
     
     w = WRFModelData(args.wrfout_file, varlst)
     ts = w['GMT']
+
+    if 'RAINC' in varlst and 'RAINNC' in varlst:
+        varlst.remove('RAINC')
+        varlst.remove('RAINNC')
+        varlst.append('RAIN')
+
+    print("Processing variables %s" % str(varlst))
 
     # create a default shape figure
     S = w.get_lons().shape
@@ -36,11 +43,11 @@ if __name__ == '__main__':
     fig = plt.figure(figsize = (S[1]/dpi, S[0]/dpi), dpi = dpi)
     print("Found %d times in wrfout." % len(ts))
 
-    caxis = (np.amin(w['T2']), np.amax(w['T2']))
 
-    for vname in ['T2']:
+    for vname in varlst:
         data = w[vname]
-        for t in range(24):
+        caxis = (np.amin(data), np.amax(data))
+        for t in range(len(ts)):
             print("Processing time %s (%d/%d) ..." % (str(ts[t]), t+1, len(ts)))
             ts_t = ts[t]
             render_to_png(fig,
