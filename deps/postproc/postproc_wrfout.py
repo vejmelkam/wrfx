@@ -8,11 +8,11 @@ import os
 from wrf_model_data import WRFModelData
 import matplotlib.pyplot as plt
 import numpy as np
+#import riak
 
 def render_to_png(fig, data, caxis, filename):
     fig.figimage(data, alpha=0.3, vmin=caxis[0], vmax=caxis[1])
     fig.savefig(filename)
-
 
 
 if __name__ == '__main__':

@@ -28,7 +28,7 @@ class WRFModelData:
             self.construct_local_time(tz_name)
     
 
-    def load_data(self, data_file, var_names):
+    def load_data(self, data_file, var_names = None):
         """
         Load required variables from the file data_file.  A list of variables
         is either supplied or the default list is used which contains the following
@@ -69,8 +69,6 @@ class WRFModelData:
             del self.fields['RAINNC']
             del self.fields['RAINC']
         
-        # precompute the equilibrium fields needed everywhere
-        self.equilibrium_moisture()
 
 
     def compute_rainfall_per_timestep(self):
@@ -159,7 +157,7 @@ class WRFModelData:
         return self.fields[name]
 
 
-    def equilibrium_moisture(self):
+    def precompute_equilibrium_moisture(self):
         """
         Uses the fields of the WRF model to compute the equilibrium
         field.
