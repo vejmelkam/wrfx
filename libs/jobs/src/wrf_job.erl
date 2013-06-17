@@ -5,13 +5,23 @@
 
 -include_lib("jobs/include/jobs.hrl").
 -include_lib("flow/include/flow.hrl").
--export([check/1, execute/1]).
+-export([id/1, check/1, execute/1]).
+
+
+%% @doc
+%% Constructs and returns an id for this job.
+%% @spec id(job_desc()) -> string()
+%%
+id(#job_desc{key=JK, cfg=Cfg}) ->
+    {From, _To} = extract_interval(Cfg),
+    lists:flatten(io_lib:format("~s_~s", [JK, esmf:time_to_string(From)])).
+
 
 
 %% @doc
 %% Checks whether the configuration structure is valid for wrf_job and makes
 %% a best-effort check if this job will be executable.
-%% @spec check(C::plist()) -> {success, []}|{failure, Reason}
+%% @spec check(job_desc()) -> {success, []}|{failure, Reason}
 %%
 check(#job_desc{cfg=C}) ->
     WRFId = plist:getp(wrf_id, C),
@@ -55,33 +65,15 @@ check_config(with_mpi, C) ->
     plan_runner:wait_for_plan(PID).
     
 
-execute(J=#job_desc{key = JK, cfg=CfgOverw}) ->
+execute(J=#job_desc{cfg=CfgOverw}) ->
 
     % read the namelist configuration from Cfg1 and update what is necessary from Cfg2
     {success, WRFTempl} = wrfx_db:lookup({nllist, plist:getp(wrf_nl_template_id, CfgOverw)}),
     CfgNl = wrf_nl:read_config(WRFTempl),
     Cfg = plist:update_with(CfgOverw, CfgNl),
 
-    % retrieve the scheduled time and construct the nominal run time
-    T = case plist:getp(schedule, Cfg) of
-	    now ->
-		{_, {Hr, _M, _S}} = calendar:universal_time(),
-		{Hr, 0, 0};
-	    {Hr, _M, _S} ->
-		{Hr, 0, 0}
-	end,
-    {Date, _} = calendar:universal_time(),
-    DT = {Date, T},
-
-    % retrieve start and end times which are specified relative to schedule or absolutely 
-    case plist:contains(from_delta_hr, Cfg) of
-	{true, _} ->
-	    From = atime:dt_shift_hours(DT, plist:getp(from_delta_hr, Cfg)),
-	    To = atime:dt_shift_hours(DT, plist:getp(to_delta_hr, Cfg));
-	false ->
-	    From = plist:getp(wrf_from, Cfg),
-	    To = plist:getp(wrf_to, Cfg)
-    end,
+    % retrieve start and end times which are specified relative to schedule (prioritized) or absolutely 
+    {From, To} = extract_interval(Cfg),
 
     % retrieve the installation directories
     WRFInstDir = wrfx_db:get_conf(plist:getp(wrf_id, Cfg)),
@@ -92,7 +84,7 @@ execute(J=#job_desc{key = JK, cfg=CfgOverw}) ->
 					     vanilla_wrf_v34),
 
     % construct job name using From
-    JI = lists:flatten(io_lib:format("~s_~s", [JK, esmf:time_to_string(From)])),
+    JI = id(Cfg),
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),
@@ -472,3 +464,18 @@ make_names([G|GF], E1, E2, E3, P) ->
     make_names(GF, E1, E2, E3+1, [{G, "GRIBFILE." ++ [E1, E2, E3]}|P]).
 
 
+
+extract_interval(Cfg) ->
+    {Hr, _M, _S} = plist:getp(schedule, Cfg),
+    {Date, _Time} = calendar:universal_time(),
+    DT = {Date, {Hr, 0, 0}},
+    case plist:contains(from_delta_hr, Cfg) of
+	{true, _} ->
+	    From = atime:dt_shift_hours(DT, plist:getp(from_delta_hr, Cfg)),
+	    To = atime:dt_shift_hours(DT, plist:getp(to_delta_hr, Cfg));
+	false ->
+	    From = plist:getp(wrf_from, Cfg),
+	    To = plist:getp(wrf_to, Cfg)
+    end,
+    {From, To}.
+    

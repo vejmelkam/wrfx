@@ -11,7 +11,7 @@
 
 -include_lib("jobs/include/jobs.hrl").
 -include_lib("flow/include/flow.hrl").
--export([check/1, execute/1, test_job/0]).
+-export([id/1, check/1, execute/1, test_job/0]).
 
 -compile(export_all).
 
@@ -33,9 +33,19 @@ test_job() ->
 
 
 %% @doc
+%% Constructs and returns an id for this job.
+%% @spec id(job_desc()) -> string()
+%%
+id(#job_desc{cfg=Cfg}) ->
+    {FromYr, _FromDay} = plist:getp(from, Cfg),
+    lists:flatten(["moisture_job_", format_time(FromYr)]).
+    
+
+
+%% @doc
 %% Checks whether the configuration structure is valid for wrf_job and makes
 %% a best-effort check if this job will be executable.
-%% @spec check(C::plist()) -> {success, []}|{failure, Reason}
+%% @spec check(job_desc()) -> {success, []}|{failure, Reason}
 %%
 check(_J=#job_desc{cfg=_C}) ->
     {success, "configuration check success"}.
@@ -44,7 +54,7 @@ check(_J=#job_desc{cfg=_C}) ->
 execute(J=#job_desc{cfg=Cfg}) ->
     [From, To, Ss] = plist:get_list([from, to, stations], Cfg),
 
-    JI = lists:flatten("moisture_job_" ++ format_time(element(1, From))),
+    JI = id(Cfg),
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),

@@ -73,15 +73,6 @@ all(T) ->
     R.
 
 
-wrap_dirty_fun(F) ->
-    try
-	ok = F(),
-	success
-    catch
-	{'EXIT', {aborted, R}} ->
-	    {failure, R}
-    end.
-
 wrap_transaction(F) ->
     case mnesia:transaction(F) of
 	{atomic, R} ->
