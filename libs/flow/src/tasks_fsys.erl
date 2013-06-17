@@ -104,10 +104,8 @@ delete(F) ->
 create_symlink(F, L) ->
     case filelib:is_file(L) of
 	true ->
-	    io:format("FILE ~p is found to exist~n", [L]),
 	    {failure, io_lib:format("a file [~s] already exists", [L])};
 	false ->
-	    io:format("FILE ~p is found NOT to exist~n", [L]),
 	    case file:make_symlink(F, L) of
 		ok ->
 		    {success, io_lib:format("created symlink [~s] -> [~s]", [L, F])};
