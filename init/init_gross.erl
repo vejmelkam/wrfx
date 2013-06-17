@@ -55,6 +55,7 @@ wrfx_db:store({job_desc, test_job, Ct}).
 
 C2 = [ {wrf_id, wrf_34_mpi},
        {wps_id, default_wps},
+       {geog_root_id, default_geog_root},
        {wrf_exec_method, immediate},
        {wps_nl_template_id, colorado_2km_1d_wps_nl},
        {wrf_nl_template_id, colorado_2km_1d_wrf_nl},
