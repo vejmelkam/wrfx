@@ -11,6 +11,7 @@
 	 rename_file/2, delete_files_regexp/2]).
 -export([delete/1]).
 
+
 %% @doc Checks if a file exists (as a regular file) on the filesystem.
 %% Wraps {@link filelib:is_regular/1}.
 %% @spec file_exists(F::string()) -> {success, string()}|{failure, string()}
@@ -32,6 +33,7 @@ dir_exists(D) ->
 	false ->
 	    {failure, check_dir_exists_task, io_lib:format("source directory ~s does not exist", [D])}
     end.
+
 
 %% @doc Create a directory on the filesystem.
 %% @spec create_dir(D::string()) -> {success, string()}|{failure, string()}
@@ -85,22 +87,33 @@ delete_dir(F) ->
 %% @doc Remove a file or a directory from the filesystem.  The directory need not be empty beforehand.
 %% @spec delete(F::string()) -> {success, string()} | {failure, string()}
 delete(F) ->
-    case filelib:is_dir(F) of
-	true ->
+    case filesys:file_type(F) of
+	directory ->
 	    delete_dir(F);
-	false ->
-	    delete_file(F)
+	symlink ->
+	    delete_file(F);
+	regular ->
+	    delete_file(F);
+	X ->
+	    {failure, io_lib:format("attempting to delete file [~s] of type ~p", [F, X])}
     end.
 
 
 %% @doc Creates a symlink to a file (file must exist).
 %% @spec create_symlink(F::string(), L::string()) -> {success, string()}|{failure, string()}
 create_symlink(F, L) ->
-    case file:make_symlink(F, L) of
-	ok ->
-	    {success, io_lib:format("created symlink [~s] -> [~s]", [L, F])};
-	{error, E} ->
-	    {failure, io_lib:format("failed to create symlink [~s] -> [~s] with error [~p]", [L, F, E])}
+    case filelib:is_file(L) of
+	true ->
+	    io:format("FILE ~p is found to exist~n", [L]),
+	    {failure, io_lib:format("a file [~s] already exists", [L])};
+	false ->
+	    io:format("FILE ~p is found NOT to exist~n", [L]),
+	    case file:make_symlink(F, L) of
+		ok ->
+		    {success, io_lib:format("created symlink [~s] -> [~s]", [L, F])};
+		{error, E} ->
+		    {failure, io_lib:format("failed to create symlink [~s] -> [~s] with error [~p]", [L, F, E])}
+	    end
     end.
 
 

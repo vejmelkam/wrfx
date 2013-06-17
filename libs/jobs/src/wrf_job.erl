@@ -84,7 +84,7 @@ execute(J=#job_desc{cfg=CfgOverw}) ->
 					     vanilla_wrf_v34),
 
     % construct job name using From
-    JI = id(Cfg),
+    JI = id(J),
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),

@@ -54,7 +54,7 @@ check(_J=#job_desc{cfg=_C}) ->
 execute(J=#job_desc{cfg=Cfg}) ->
     [From, To, Ss] = plist:get_list([from, to, stations], Cfg),
 
-    JI = id(Cfg),
+    JI = id(J),
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),

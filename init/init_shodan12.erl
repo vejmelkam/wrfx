@@ -7,12 +7,14 @@ wrfx_db:set_conf(wrf_34_serial, "/home/martin/Projects/wrf-fire/WRFV3").
 wrfx_db:set_conf(default_wps, "/home/martin/Projects/wrf-fire/WPS").
 wrfx_db:set_conf(scraper_path, "/home/martin/Projects/wrfx/deps/scraper/extract_observations.py").
 wrfx_db:set_conf(moisture_code_path, "/home/martin/Projects/moisture-assimilation/prototypej/run_data_assimilation.jl").
+wrfx_db:set_conf(default_geog_root, "/home/martin/Projects/WPS_GEOG").
 wrfx_db:set_conf(ncks_path, "/usr/bin/ncks").
 
 % store a small serial job
 C = [ {wrf_id, wrf_34_serial},
       {wps_id, default_wps},
       {wrf_exec_method, immediate},
+      {geog_root_id, default_geog_root},
       {wps_nl_template_id, colorado_8km_1d_wps_nl},
       {wrf_nl_template_id, colorado_8km_1d_wrf_nl},
       {from_delta_hr, -40},
@@ -20,7 +22,7 @@ C = [ {wrf_id, wrf_34_serial},
       {grib_interval_seconds, 3600},
       {history_interval_min, 30},
       {grib_sources, [rnrs_nam218]},
-      {schedule, now},
+      {schedule, {9,0,0}},
       {auto_start, false},
       {mf, {wrf_job, execute}}].
 
