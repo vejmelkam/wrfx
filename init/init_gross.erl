@@ -25,7 +25,7 @@ C = [ {wrf_id, wrf_34_mpi},
       {mpi_nodes, [ "node09", "node10", "node11", "node12" ]},
       {schedule, {9, 0, 0}},
       {auto_start, true},
-      {ncks_prune_wrfout, ["Times", "T2", "PSFC", "XLAT", "XLONG", "Q2", "RAINNC", "RAINC", "HGT"]},
+%      {ncks_prune_wrfout, ["Times", "T2", "PSFC", "XLAT", "XLONG", "Q2", "RAINNC", "RAINC", "HGT"]},
       {mf, {wrf_job, execute}}].
 
 wrfx_db:store({job_desc, colorado_2km_op_wrf_48hr_run, C}).
@@ -47,7 +47,7 @@ Ct = [ {wrf_id, wrf_34_mpi},
        {mpi_nodes, [ "node09", "node10", "node11", "node12" ]},
        {schedule, now},
        {auto_start, false},
-       {ncks_prune_wrfout, ["Times", "T2", "PSFC", "XLAT", "XLONG", "Q2", "RAINNC", "RAINC", "HGT"]},
+%       {ncks_prune_wrfout, ["Times", "T2", "PSFC", "XLAT", "XLONG", "Q2", "RAINNC", "RAINC", "HGT"]},
        {mf, {wrf_job, execute}}].
 
 wrfx_db:store({job_desc, test_job, Ct}).
@@ -69,7 +69,7 @@ C2 = [ {wrf_id, wrf_34_mpi},
        {mpi_nodes, [ "node09", "node10", "node11", "node12" ]},
        {schedule, {8, 0, 0}},
        {auto_start, false},
-       {ncks_prune_wrfout, ["Times", "T2", "PSFC", "XLAT", "XLONG", "Q2", "RAINNC", "RAINC", "HGT"]},
+ %      {ncks_prune_wrfout, ["Times", "T2", "PSFC", "XLAT", "XLONG", "Q2", "RAINNC", "RAINC", "HGT"]},
        {mf, {wrf_job, execute}}].
 
 wrfx_db:store({job_desc, colorado_2km_1hr_run, C2}).
