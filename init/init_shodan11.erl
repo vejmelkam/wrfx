@@ -13,16 +13,18 @@ wrfx_db:set_conf(moisture_code_path, "/home/martin/Projects/moisture-assimilatio
 % store the operational forecast job
 C = [ {wrf_id, wrf_34_serial},
       {wps_id, default_wps},
-      {geog_root, default_geog_root},
+      {geog_root_id, default_geog_root},
       {wrf_exec_method, immediate},
       {wps_nl_template_id, colorado_8km_1d_wps_nl},
       {wrf_nl_template_id, colorado_8km_1d_wrf_nl},
-      {from_delta_hr, 0},
-      {to_delta_hr, 2},
+%      {from_delta_hr, -24},
+%      {to_delta_hr, -16},
+      {wrf_from, {{2013, 6, 4}, {0, 0, 0}}},
+      {wrf_to, {{2013, 6, 5}, {0, 0, 0}}},
       {grib_interval_seconds, 3600},
       {history_interval_min, 30},
       {grib_sources, [rnrs_nam218]},
-      {schedule, now},
+      {schedule, {9,0,0}}, % this is in local time!
       {ncks_prune_wrfout, ["Times", "T2", "PSFC", "XLAT", "XLONG", "Q2", "RAINNC", "RAINC", "HGT"]},
       {auto_start, false},
       {mf, {wrf_job, execute}}].
@@ -47,13 +49,14 @@ C2 = [ {from, {{2012,6,2}, {0, 0, 0}}},
 wrfx_db:store({job_desc, moisture_test_run, C2}).
 
 
-C2 = [ {wrf_id, wrf_34_mpi},
+C3 = [ {wrf_id, wrf_34_mpi},
        {wps_id, default_wps},
+       {geog_root_id, default_geog_root},
        {wrf_exec_method, immediate},
        {wps_nl_template_id, colorado_2km_1d_wps_nl},
        {wrf_nl_template_id, colorado_2km_1d_wrf_nl},
        {from_delta_hr, 0},
-       {to_delta_hr, 5},
+       {to_delta_hr, 1},
        {grib_interval_seconds, 3600},
        {history_interval_min, 30},
        {grib_sources, [rnrs_nam218]},
@@ -65,7 +68,7 @@ C2 = [ {wrf_id, wrf_34_mpi},
        {ncks_prune_wrfout, ["Times", "T2", "PSFC", "XLAT", "XLONG", "Q2", "RAINNC", "RAINC", "HGT"]},
        {mf, {wrf_job, execute}}].
 
-wrfx_db:store({job_desc, colorado_2km_1hr_run, C2}).
+wrfx_db:store({job_desc, colorado_2km_1hr_run, C3}).
 
 
 % store the example namelists

@@ -40,7 +40,7 @@ check(#job_desc{cfg=C}) ->
 
 check_config(no_mpi, C) ->
     Ts = [ {tasks_verify, check_keys,
-	    [ [wrf_id, wps_id, wrf_exec_method, wps_nl_template_id, geog_root,
+	    [ [wrf_id, wps_id, wrf_exec_method, wps_nl_template_id, geog_root_id,
 	       wrf_nl_template_id, grib_sources, schedule], C ]},
 	   {tasks_verify, namelist_exists, [plist:getp(wps_nl_template_id, C)]},
 	   {tasks_verify, namelist_exists, [plist:getp(wrf_nl_template_id, C)]},
@@ -53,7 +53,7 @@ check_config(no_mpi, C) ->
 
 check_config(with_mpi, C) ->
     Ts = [ {tasks_verify, check_keys,
-	    [ [wrf_id, wps_id, wrf_exec_method, wps_nl_template_id, geog_root,
+	    [ [wrf_id, wps_id, wrf_exec_method, wps_nl_template_id, geog_root_id,
 	       wrf_nl_template_id, grib_sources, schedule, mpi_exec_name,
 	       mpi_nprocs, mpi_nodes], C ]},
 	   {tasks_verify, namelist_exists, [plist:getp(wps_nl_template_id, C)]},

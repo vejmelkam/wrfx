@@ -17,12 +17,14 @@ C = [ {wrf_id, wrf_34_serial},
       {geog_root_id, default_geog_root},
       {wps_nl_template_id, colorado_8km_1d_wps_nl},
       {wrf_nl_template_id, colorado_8km_1d_wrf_nl},
-      {from_delta_hr, -40},
-      {to_delta_hr, -24},
+%      {from_delta_hr, -24},
+%      {to_delta_hr, -16},
+      {wrf_from, {{2013, 6, 4}, {0, 0, 0}}},
+      {wrf_to, {{2013, 6, 5}, {0, 0, 0}}},
       {grib_interval_seconds, 3600},
       {history_interval_min, 30},
       {grib_sources, [rnrs_nam218]},
-      {schedule, {9,0,0}},
+      {schedule, {9,0,0}},  % this is in LOCAL TIME!
       {auto_start, false},
       {mf, {wrf_job, execute}}].
 
