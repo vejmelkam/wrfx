@@ -19,8 +19,9 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', metavar = 'P', type=int, dest='riak_port', help='riak port accepting pbc transactions')
     args = parser.parse_args()
 
-    files = glob.glob(wildcard)
+    files = glob.glob(args.wildcard)
     N = len(files)
+    print("INFO: found %d files ..." % N)
 
     print("INFO: setting up RIAK client")
     client = riak.RiakClient(host = args.riak_host,
@@ -28,7 +29,6 @@ if __name__ == '__main__':
                              protocol = 'pbc')
     bucket = client.bucket(args.bucket)
 
-    print("INFO: uploading %d files ..." % N)
 
     ndx = 1
     for fname in files:
