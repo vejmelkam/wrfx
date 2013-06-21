@@ -55,6 +55,7 @@ execute(J=#job_desc{cfg=Cfg}) ->
     [From, To, Ss] = plist:get_list([from, to, stations], Cfg),
 
     JI = id(J),
+    io:format("id is ~p~n", [JI]),
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),
@@ -70,18 +71,22 @@ execute(J=#job_desc{cfg=Cfg}) ->
 			      {started, calendar:local_time()},
 			      {instr, []}], Cfg),
 
+    io:format("Config is ~p~n", [Cfg2]),
+
     Log = logd:open([stdio, filename:join(Wkspace, "moisture_job.log")]),
 
+    io:format("Log ~p is open.~n", [Log]),
     % retrieve all xls files from Mesowest (or from file cache)
     Ds = atime:dt_covering_days(From, To),
+    io:format("Covering days ~p~n", [Ds]),
     Is = retrieve_infos(Ss),
     Fs = retrieve_xls_files(Ds, Ss),
 
     % construct the observation variance table (substitute for actual variance estimates)
     Table = string:join(lists:map(fun ({V,Var}) -> V ++ ", " ++ Var end,
-				  plist:getp(obs_var_table, Cfg)), "\n") ++ "\n",
+				  plist:getp(obs_var_table, Cfg2)), "\n") ++ "\n",
 
-    MCDir = filename:dirname(wrfx_db:get_conf(moisture_code_path)),
+    MCDir = "deps/fmda_julia",
 
     Ts = [ {tasks_fsys, create_symlink, [F, filename:join(Dir, filename:basename(F))]} || F <- Fs ] ++
 	 [ {tasks_fsys, create_symlink, [F, filename:join(Dir, filename:basename(F))]} || F <- Is ] ++
@@ -96,7 +101,7 @@ execute(J=#job_desc{cfg=Cfg}) ->
 				    {exit_check, exit_code}]]},
 	   {tasks_fsys, delete_files_regexp, [Dir, ".*\.xls"]},
 	   #instr_task{
-	      mfa = {tasks_exec, execute, [wrfx_db:get_conf(moisture_code_path),
+	      mfa = {tasks_exec, execute, [filename:join(MCDir, "run_data_assimilation.jl"),
 					   [ {in_dir, MCDir},
 					     {output_type, stdout},
 					     {op_args, [{args, ["rda.cfg"]}]},
@@ -254,6 +259,7 @@ retrieve_infos(Ss) ->
     lists:map(fun retrieve_info/1, Ss).
 
 retrieve_info(Code) ->
+    io:format("retrieving info file for ~p~n", [Code]),
     Name = Code ++ ".info",
     MesoDom = ?DOMAIN ++ "/info",
     case wrfx_fstor:exists({MesoDom, Name}) of

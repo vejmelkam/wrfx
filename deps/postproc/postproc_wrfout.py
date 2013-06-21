@@ -139,6 +139,12 @@ if __name__ == '__main__':
     mst = pytz.timezone("US/Mountain")
     gmt = pytz.timezone("GMT")
 
+    print("INFO: setting up RIAK client")
+    client = riak.RiakClient(host = args.riak_host,
+                             pb_port = args.riak_port,
+                             protocol = 'pbc')
+    bucket = client.bucket(args.bucket)
+
     # loop through variables requested
     for vname in varlst:
         print("INFO: processing variable %s ..." % vname)
@@ -153,6 +159,8 @@ if __name__ == '__main__':
             ts_t = ts[t]
             ts_str = ts_t.strftime("%Y-%m-%d_%H:%M:00")
             ts_mst_str = ts_t.astimezone(mst).strftime("%Y-%m-%d %H:%M:00")
+            riak_key = vname + "_" + ts_str
+            fname = os.path.join(args.output_dir, riak_key + ".png")
             render_to_png(fig,
                           m,
                           data[t, :, :],
@@ -161,6 +169,16 @@ if __name__ == '__main__':
                           counties,
                           caxis,
                           "%s at %s" % (vname, ts_mst_str),
-                          os.path.join(args.output_dir, vname + "_" + ts_str + ".png"))
+                          fname)
+
+            # read in the file just generated
+            with open(fname, 'rb') as f:
+                fig_data = f.read()
+
+            # store it in RIAK
+            new_fig = bucket.new(riak_key,
+                                 encoded_data = fig_data,
+                                 content_type = 'image/png')
+            new_fig.store()
 
 

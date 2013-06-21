@@ -78,7 +78,7 @@ dt_ts_str({{Y, M, D}, {H, Min, S}}) ->
     lists:flatten(io_lib:format("~4..0B~2..0B~2..0B:~2..0B~2..0B~2..0B", [Y, M, D, H, Min, S])).
 
 
-dt_covering_days({D1, _}, {D2, _}) ->
+dt_covering_days({D1, _}, {D2, _}) when D2 >= D1->
     days_covering(D1, D2, []).
     
 days_covering(D, D, Ds) ->
