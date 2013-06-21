@@ -74,13 +74,13 @@ execute(J=#job_desc{cfg=Cfg}) ->
     Wkspace = wrfx_db:get_conf(workspace_root),
     Log = logd:open([stdio, filename:join(Wkspace, lists:flatten([JI, ".log"]))]),
     logd:message("[FD] [STAGE] running wrf job", Log),
-%    case wrf_job:execute(WJ) of
-%	#job_report{result = {success, _}} ->
+    case wrf_job:execute(WJ) of
+	#job_report{result = {success, _}} ->
 	    logd:message("[FD] [STAGE] running moisture job", Log),
-	    run_moisture_job(J#job_desc{cfg=Cfg2}, Log).
-%	Failure ->
-%	    job_failed(wrf_job, J, Failure, Log)
-%    end.
+	    run_moisture_job(J#job_desc{cfg=Cfg2}, Log);
+	Failure ->
+	    job_failed(wrf_job, J, Failure, Log)
+    end.
 
 
 run_moisture_job(J=#job_desc{cfg=Cfg}, Log) ->
