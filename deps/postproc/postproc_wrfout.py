@@ -110,17 +110,28 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', metavar = 'P', type=int, dest='riak_port', help='riak port accepting pbc transactions')
     args = parser.parse_args()
 
-    varlst = args.varlst or 'T2,PSFC,Q2,RAINC,RAINNC'
+    varlst = args.varlst or 'T2,RAIN,RH,FM1,FM10,FM100'
     varlst = string.split(varlst, ',')
 
+    # load required variables
+    load_lst = list(varlst)
+    if 'RAIN' in load_lst:
+        load_lst.remove('RAIN')
+        load_lst.extend(['RAINC', 'RAINNC' ])
+
+    if 'RH' in load_lst:
+        load_lst.remove('RH')
+        load_lst.extend(['T2', 'PSFC', 'Q2'])
+
+    load_lst = list(set(load_lst))
+    print("INFO: loading the following variables %s" % str(load_lst))
+
     print("INFO: loading wrf model output data ...")
-    w = WRFModelData(args.wrfout_file, varlst)
+    w = WRFModelData(args.wrfout_file, load_lst)
     ts = w['GMT']
 
-    if 'RAINC' in varlst and 'RAINNC' in varlst:
-        varlst.remove('RAINC')
-        varlst.remove('RAINNC')
-        varlst.append('RAIN')
+    if 'RH' in varlst:
+        w.compute_relative_humidity()
 
     print("INFO: processing variables %s" % str(varlst))
 
@@ -142,13 +153,15 @@ if __name__ == '__main__':
     # loop through variables requested
     for vname in varlst:
         print("INFO: processing variable %s ..." % vname)
+
         data = w[vname]
         if vname == 'T2':
             # convert to Fahrenheit
             data = (data - 273.15) * 9.0 / 5 + 32.0
 
         caxis = (np.amin(data), np.amax(data))
-        for t in range(len(ts)):
+#        for t in range(len(ts)):
+        for t in range(10):
             print("Processing time %s (%d/%d) ..." % (str(ts[t]), t+1, len(ts)))
             ts_t = ts[t]
             ts_str = ts_t.strftime("%Y-%m-%d_%H:%M:00")

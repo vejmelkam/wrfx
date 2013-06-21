@@ -33,7 +33,7 @@ if __name__ == '__main__':
     ndx = 1
     for fname in files:
         print("Uploading %s (%d/%d) ..." % (fname, ndx, N))
-        riak_key = fname.split('.')[0]
+        riak_key = os.path.basename(fname).split('.')[0]
 
         # read in the file
         with open(fname, 'rb') as f:

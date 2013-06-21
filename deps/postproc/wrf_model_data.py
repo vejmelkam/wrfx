@@ -196,6 +196,27 @@ class WRFModelData:
         self.fields['Ew'] = Ew
 
 
+    def compute_relative_humidity(self):
+        """
+        Return the relative humidity.
+        """
+        # load the standard fields
+        P = self['PSFC']
+        Q = self['Q2']
+        T = self['T2'] 
+
+        # saturated vapor pressure (at each location, size n x 1)
+        Pws = np.exp(54.842763 - 6763.22/T - 4.210 * np.log(T) + 0.000367*T + np.tanh(0.0415*(T - 218.8)) 
+            * (53.878 - 1331.22/T - 9.44523 * np.log(T) + 0.014025*T))
+          
+        # water vapor pressure (at each location, size n x 1)
+        Pw = P * Q / (0.622 + (1 - 0.622) * Q)
+        
+        # store the relative humidity (percent, at each location, size n x 1)
+        self.fields['RH'] = 100 * Pw / Pws
+
+
+
     def get_moisture_equilibria(self):
         """
         Return the drying and wetting equilibrium.
