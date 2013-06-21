@@ -14,7 +14,7 @@
 %%
 id(#job_desc{key=JK, cfg=Cfg}) ->
     {From, _To} = extract_interval(Cfg),
-    lists:flatten([JK, "_", esmf:time_to_string(From)]).
+    lists:flatten([atom_to_list(JK), "_", esmf:time_to_string(From)]).
 
 
 

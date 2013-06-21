@@ -102,8 +102,19 @@ C4 = [ {wrf_job_id, colorado_2km_short_run},
        {mf, {fire_danger_job, execute}}
      ].
 
-wrfx_db:store({job_desc, fire_danger_operational_v1, C4}).
+wrfx_db:store({job_desc, fire_danger_operational_test, C4}).
 
+
+C5 = [ {wrf_job_id, colorado_2km_op_wrf_48hr_run},
+       {moisture_job_id, moisture_colorado_run},
+       {wrfout_base, "wrfout_d01_"},
+       {vars, "T2,RH,RAIN,FM1,FM10,FM100"},
+       {riak_host, "localhost"},
+       {riak_port, "10017"},
+       {auto_start, true},
+       {mf, {fire_danger_job, execute}} ].
+
+wrfx_db_store({job_desc, fire_danger_operational_v1, C5}).
 
 
 % store the example namelists

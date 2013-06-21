@@ -9,6 +9,7 @@ import numpy as np
 import pytz
 import riak
 import shapefile
+from multiprocessing import Pool, Queue, Process
 
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
@@ -17,8 +18,48 @@ from mpl_toolkits.basemap import Basemap
 from wrf_model_data import WRFModelData
 
 
-def render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, title, fname):
+def postproc_worker(w, args, counties, jobs):
+    fig = plt.figure(figsize = (8, 6))
 
+    print("WORKER: setting up RIAK client")
+    client = riak.RiakClient(host = args.riak_host,
+                             pb_port = args.riak_port,
+                             protocol = 'pbc')
+    bucket = client.bucket(args.bucket)
+
+    # setup basemap projection
+    print("WORKER: setting up basemap projection")
+    lats, lons = w.get_lats(), w.get_lons()
+    m = setup_basemap_proj(lats, lons)
+    mx, my = m(lons, lats)
+
+    # rendering, saving, uploading loop
+    while True:
+        # get next job or it none, quit
+        tmp = jobs.get()
+        if tmp == None:
+            return
+
+        data, caxis, riak_key, fname = tmp
+
+        # perform the render
+        render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, fname)
+
+        # read in the file just generated
+        with open(fname, 'rb') as f:
+            fig_data = f.read()
+
+        # store it in RIAK
+        new_fig = bucket.new(riak_key,
+                             encoded_data = fig_data,
+                             content_type = 'image/png')
+        new_fig.store()
+        
+        
+
+
+
+def render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, fname):
     # prep figure for reuse
     fig.clf()
     ax = plt.subplot(111)
@@ -41,11 +82,12 @@ def render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, title, fnam
         ax.add_collection(county)
 
     # add title & colorbar
-    plt.title(title)
     plt.clim(caxis)
     plt.colorbar()
 
     fig.savefig(fname)
+    fig.clf()
+
 
 
 def load_colorado_shapes(m):
@@ -113,6 +155,8 @@ if __name__ == '__main__':
     varlst = args.varlst or 'T2,RAIN,RH,FM1,FM10,FM100'
     varlst = string.split(varlst, ',')
 
+    num_workers = 10
+
     # load required variables
     load_lst = list(varlst)
     if 'RAIN' in load_lst:
@@ -135,30 +179,18 @@ if __name__ == '__main__':
 
     print("INFO: processing variables %s" % str(varlst))
 
-    # create a default shape figure and basemap projection
-    print("INFO: preparing projection ...")
-    lats, lons = w.get_lats(), w.get_lons()
-    fig = plt.figure(figsize = (10, 6))
-    m = setup_basemap_proj(lats, lons)
-    mx, my = m(lons, lats)
-
     print("INFO: loading county shapes ...")
+    lats, lons = w.get_lats(), w.get_lons()
+    m = setup_basemap_proj(lats, lons)
     counties = load_colorado_shapes(m)
 
     print("INFO: found %d times in wrfout." % len(ts))
 
-    mst = pytz.timezone("US/Mountain")
-    gmt = pytz.timezone("GMT")
-
-    print("INFO: setting up RIAK client")
-    client = riak.RiakClient(host = args.riak_host,
-                             pb_port = args.riak_port,
-                             protocol = 'pbc')
-    bucket = client.bucket(args.bucket)
+    plot_queue = Queue()
 
     # loop through variables requested
     for vname in varlst:
-        print("INFO: processing variable %s ..." % vname)
+        print("INFO: enqueuing variable %s ..." % vname)
 
         data = w[vname]
         if vname == 'T2':
@@ -166,32 +198,26 @@ if __name__ == '__main__':
             data = (data - 273.15) * 9.0 / 5 + 32.0
 
         caxis = (np.amin(data), np.amax(data))
-#        for t in range(len(ts)):
-        for t in range(10):
-            print("Processing time %s (%d/%d) ..." % (str(ts[t]), t+1, len(ts)))
+        for t in range(len(ts)):
             ts_t = ts[t]
             ts_str = ts_t.strftime("%Y-%m-%d_%H:%M:00")
-            ts_mst_str = ts_t.astimezone(mst).strftime("%Y-%m-%d %H:%M:00")
             riak_key = vname + "_" + ts_str
             fname = os.path.join(args.output_dir, riak_key + ".png")
-            render_to_png(fig,
-                          m,
-                          data[t, :, :],
-                          lats, lons,
-                          mx, my,
-                          counties,
-                          caxis,
-                          "%s at %s" % (vname, ts_mst_str),
-                          fname)
+            plot_queue.put((data[t, :, :], caxis, riak_key, fname))
 
-            # read in the file just generated
-            with open(fname, 'rb') as f:
-                fig_data = f.read()
+    # start the worker pool
+    workers = []
+    for i in range(num_workers): 
+        # end-of-queue marker (one for each worker)
+        plot_queue.put(None)
 
-            # store it in RIAK
-            new_fig = bucket.new(riak_key,
-                                 encoded_data = fig_data,
-                                 content_type = 'image/png')
-            new_fig.store()
+        # create a new worker and add it to the pool
+        tmp = Process(target=postproc_worker, args=(w, args, counties, plot_queue))
+        tmp.start()
+        workers.append(tmp)
 
+    for worker in workers:
+        worker.join()
+
+    print("INFO: all workers done, exiting.")
 

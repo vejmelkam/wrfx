@@ -75,7 +75,7 @@ get_scheduler(Jid) ->
 
 init(_Args) ->
     Js = wrfx_db:all(job_desc),
-    AutoJs = lists:filter(fun (#job_desc{cfg=C}) -> plist:getp(auto_start, C) end, Js),
+    AutoJs = lists:filter(fun (#job_desc{cfg=C}) -> plist:getp(auto_start, C, false) end, Js),
     Infos = lists:map(fun start_job/1, AutoJs),
     {ok, Infos}.
 
