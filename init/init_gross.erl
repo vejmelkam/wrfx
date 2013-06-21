@@ -60,19 +60,19 @@ C2 = [ {wrf_id, wrf_34_mpi},
        {wps_nl_template_id, colorado_2km_1d_wps_nl},
        {wrf_nl_template_id, colorado_2km_1d_wrf_nl},
        {from_delta_hr, 0},
-       {to_delta_hr, 5},
+       {to_delta_hr, 2},
        {grib_interval_seconds, 3600},
        {history_interval_min, 30},
        {grib_sources, [rnrs_nam218]},
        {mpi_exec_name, "/usr/mpi/gcc/openmpi-1.4.3/bin/mpiexec"},
        {mpi_nprocs, 12*4},
        {mpi_nodes, [ "node09", "node10", "node11", "node12" ]},
-       {schedule, {8, 0, 0}},
+       {schedule, {20, 0, 0}},
        {auto_start, false},
  %      {ncks_prune_wrfout, ["Times", "T2", "PSFC", "XLAT", "XLONG", "Q2", "RAINNC", "RAINC", "HGT"]},
        {mf, {wrf_job, execute}}].
 
-wrfx_db:store({job_desc, colorado_2km_1hr_run, C2}).
+wrfx_db:store({job_desc, colorado_2km_short_run, C2}).
 
 C3 = [ {from, {{2013,6,19}, {9, 0, 0}}},
        {to, {{2013,6,21}, {9, 0, 0}}},
@@ -85,10 +85,24 @@ C3 = [ {from, {{2013,6,19}, {9, 0, 0}}},
 		   "TS654", "TS761", "TS799", "TS809", "TS864", "TS875", "TS905", "TS925",
 		   "TS938", "TS971", "UCNC2", "WLCC2" ]},
        {obs_var_table, [ {"FM", "1e-4"}, {"RELH", "2.5e-3"}, {"TMP", "0.25"} ]},
-       {auto_start, false}
+       {auto_start, false},
+       {mf, {moisture_job, execute}}
      ].
 
-wrfx_db:store({job_desc, moisture_test_run, C3}).
+wrfx_db:store({job_desc, moisture_colorado_run, C3}).
+
+
+C4 = [ {wrf_job_id, colorado_2km_short_run},
+       {moisture_job_id, moisture_colorado_run},
+       {wrfout_base, "wrfout_d01_"},
+       {vars, "T2,RH,RAIN,FM1,FM10,FM100"},
+       {riak_host, "localhost"},
+       {riak_port, "10017"},
+       {auto_start, false},
+       {mf, {fire_danger_job, execute}}
+     ].
+
+wrfx_db:store({job_desc, fire_danger_operational_v1, C4}).
 
 
 

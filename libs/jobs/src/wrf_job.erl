@@ -5,7 +5,7 @@
 
 -include_lib("jobs/include/jobs.hrl").
 -include_lib("flow/include/flow.hrl").
--export([id/1, check/1, execute/1]).
+-export([id/1, check/1, execute/1, extract_interval/1]).
 
 
 %% @doc
@@ -14,7 +14,7 @@
 %%
 id(#job_desc{key=JK, cfg=Cfg}) ->
     {From, _To} = extract_interval(Cfg),
-    lists:flatten(io_lib:format("~s_~s", [JK, esmf:time_to_string(From)])).
+    lists:flatten([JK, "_", esmf:time_to_string(From)]).
 
 
 

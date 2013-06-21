@@ -13,8 +13,6 @@
 -include_lib("flow/include/flow.hrl").
 -export([id/1, check/1, execute/1, test_job/0]).
 
--compile(export_all).
-
 -define(DOMAIN, "mwest").
 -define(MWEST_DL_URL, "http://mesowest.utah.edu/cgi-bin/droman/meso_download_mesowest_ndb.cgi?").
 -define(MWEST_INFO_URL, "http://mesowest.utah.edu/cgi-bin/droman/side_mesowest.cgi?stn=").
@@ -171,14 +169,12 @@ store_output_files(#job_desc{cfg=Cfg}, Log)->
     LFName = lists:flatten(io_lib:format("~s.log", [JI])),
 
     T1 = [ {wrfx_fstor, store, [{Dom, X}, filename:join(Dir, X)]} ||
-	    X <- filesys:list_dir_regexp(Dir, "wrfout.+") ],
-    T2 = [ {wrfx_fstor, store, [{Dom, X}, filename:join(Dir, X)]} ||
 	    X <- filesys:list_dir_regexp(Dir, "frame.+") ],
-    T3 = [ {wrfx_fstor, store, [{Dom, X}, filename:join(Dir, X)]} ||
+    T2 = [ {wrfx_fstor, store, [{Dom, X}, filename:join(Dir, X)]} ||
 	     X <- [ "moisture_code.log", "moisture_model_v2_diagnostics.txt",
 		    "obs_var_table", "station_list"] ],
 
-    Plan = #plan{id = post_moisture_plan, tasks = lists:append([T1,T2,T3])},
+    Plan = #plan{id = post_moisture_plan, tasks = lists:append([T1,T2])},
     PL = plan_logger:start(Log),
     PID = plan_runner:execute_plan(Plan, [PL]),
     case plan_runner:wait_for_plan(PID) of
