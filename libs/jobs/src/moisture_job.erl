@@ -55,7 +55,6 @@ execute(J=#job_desc{cfg=Cfg}) ->
     [From, To, Ss] = plist:get_list([from, to, stations], Cfg),
 
     JI = id(J),
-    io:format("id is ~p~n", [JI]),
 
     % construct temporary workspaces from job name
     Wkspace = wrfx_db:get_conf(workspace_root),
@@ -71,14 +70,11 @@ execute(J=#job_desc{cfg=Cfg}) ->
 			      {started, calendar:local_time()},
 			      {instr, []}], Cfg),
 
-    io:format("Config is ~p~n", [Cfg2]),
+    LFName = lists:flatten(io_lib:format("~s.log", [JI])),
+    Log = logd:open([stdio, filename:join(Wkspace, LFName)]),
 
-    Log = logd:open([stdio, filename:join(Wkspace, "moisture_job.log")]),
-
-    io:format("Log ~p is open.~n", [Log]),
     % retrieve all xls files from Mesowest (or from file cache)
     Ds = atime:dt_covering_days(From, To),
-    io:format("Covering days ~p~n", [Ds]),
     Is = retrieve_infos(Ss),
     Fs = retrieve_xls_files(Ds, Ss),
 
@@ -86,14 +82,14 @@ execute(J=#job_desc{cfg=Cfg}) ->
     Table = string:join(lists:map(fun ({V,Var}) -> V ++ ", " ++ Var end,
 				  plist:getp(obs_var_table, Cfg2)), "\n") ++ "\n",
 
-    MCDir = "deps/fmda_julia",
-
+    {ok, WD} = file:get_cwd(),
+    
     Ts = [ {tasks_fsys, create_symlink, [F, filename:join(Dir, filename:basename(F))]} || F <- Fs ] ++
 	 [ {tasks_fsys, create_symlink, [F, filename:join(Dir, filename:basename(F))]} || F <- Is ] ++
 	 [ {tasks_fsys, write_file, [filename:join(Dir, "obs_var_table"), Table]},
 	   {tasks_fsys, write_file, [filename:join(Dir, "station_list"), string:join(Ss, "\n") ++ "\n"]},
-	   {tasks_fsys, write_file, [filename:join(MCDir, "rda.cfg"), make_config_file(Cfg2)]},
-	   {tasks_exec, execute, [wrfx_db:get_conf(scraper_path),
+	   {tasks_fsys, write_file, ["deps/fmda_julia/rda.cfg", make_config_file(Cfg2)]},
+	   {tasks_exec, execute, [filename:join(WD, "deps/fmda_scraper/extract_observations.py"),
 				  [ {in_dir, Dir},
 				    {output_type, stdout},
 				    {op_args, [{args, ["station_list", "obs_var_table"]}]},
@@ -101,8 +97,8 @@ execute(J=#job_desc{cfg=Cfg}) ->
 				    {exit_check, exit_code}]]},
 	   {tasks_fsys, delete_files_regexp, [Dir, ".*\.xls"]},
 	   #instr_task{
-	      mfa = {tasks_exec, execute, [filename:join(MCDir, "run_data_assimilation.jl"),
-					   [ {in_dir, MCDir},
+	      mfa = {tasks_exec, execute, [filename:join(WD, "deps/fmda_julia/run_data_assimilation.jl"),
+					   [ {in_dir, "deps/fmda_julia"},
 					     {output_type, stdout},
 					     {op_args, [{args, ["rda.cfg"]}]},
 					     {store_output_to, filename:join(Dir, "moisture_code.log")},
@@ -169,7 +165,6 @@ job_failed(A, J=#job_desc{key=JK, cfg=Cfg}, Log, {failure, Err}) ->
 
 	    
 store_output_files(#job_desc{cfg=Cfg}, Log)->
-
     Dir = plist:getp(exec_dir, Cfg),
     JI = plist:getp(job_id, Cfg),
     Dom = plist:getp(job_domain, Cfg),
@@ -179,8 +174,11 @@ store_output_files(#job_desc{cfg=Cfg}, Log)->
 	    X <- filesys:list_dir_regexp(Dir, "wrfout.+") ],
     T2 = [ {wrfx_fstor, store, [{Dom, X}, filename:join(Dir, X)]} ||
 	    X <- filesys:list_dir_regexp(Dir, "frame.+") ],
+    T3 = [ {wrfx_fstor, store, [{Dom, X}, filename:join(Dir, X)]} ||
+	     X <- [ "moisture_code.log", "moisture_model_v2_diagnostics.txt",
+		    "obs_var_table", "station_list"] ],
 
-    Plan = #plan{id = post_moisture_plan, tasks = lists:append([T1,T2])},
+    Plan = #plan{id = post_moisture_plan, tasks = lists:append([T1,T2,T3])},
     PL = plan_logger:start(Log),
     PID = plan_runner:execute_plan(Plan, [PL]),
     case plan_runner:wait_for_plan(PID) of

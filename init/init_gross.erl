@@ -74,9 +74,9 @@ C2 = [ {wrf_id, wrf_34_mpi},
 
 wrfx_db:store({job_desc, colorado_2km_1hr_run, C2}).
 
-C2 = [ {from, {{2013,6,19}, {9, 0, 0}}},
+C3 = [ {from, {{2013,6,19}, {9, 0, 0}}},
        {to, {{2013,6,21}, {9, 0, 0}}},
-       {wrfout, "/home/mvejmelka/Projects/wrfx/stor/outputs/colorado_2km_op_wrf_48hr_run_2013-06-19_09:00:00/wrfout_d01_2013-06-19_09:00:00"},
+       {wrfout, "/home/mvejmelka/Projects/wrfx/stor/outputs/colorado_2km_op_wrf_48hr_run_2013-06-19_09\:00\:00/wrfout_d01_2013-06-19_09\:00\:00"},
        {stations, ["BAWC2", "BBRC2", "BMOC2", "BTAC2", "CCDC2", "CCEC2", "CCYC2", "CHAC2",
 		   "CHRC2", "CPPC2", "CPTC2", "CTPC2", "CUHC2", "CYNC2", "DYKC2", "ESPC2",
 		   "HACC2", "HRBC2", "JNSC2", "KSHC2", "LKGC2", "LPFC2", "MITC2", "MMRC2",
@@ -88,7 +88,7 @@ C2 = [ {from, {{2013,6,19}, {9, 0, 0}}},
        {auto_start, false}
      ].
 
-wrfx_db:store({job_desc, moisture_test_run, C2}).
+wrfx_db:store({job_desc, moisture_test_run, C3}).
 
 
 
