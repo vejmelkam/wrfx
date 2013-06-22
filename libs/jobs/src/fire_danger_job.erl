@@ -75,10 +75,12 @@ execute(J=#job_desc{cfg=Cfg}) ->
     Log = logd:open([stdio, filename:join(Wkspace, lists:flatten([JI, ".log"]))]),
     logd:message("[FD] [STAGE] running wrf job", Log),
     case wrf_job:execute(WJ) of
-	#job_report{result = {success, _}} ->
+	Report = #job_report{result = {success, _}} ->
+	    wrfx_db:store(Report),
 	    logd:message("[FD] [STAGE] running moisture job", Log),
 	    run_moisture_job(J#job_desc{cfg=Cfg2}, Log);
 	Failure ->
+	    wrfx_db:store(Failure),
 	    job_failed(wrf_job, J, Failure, Log)
     end.
 
@@ -87,9 +89,11 @@ run_moisture_job(J=#job_desc{cfg=Cfg}, Log) ->
     logd:message("[FD] [STAGE] running moisture code", Log),
     MJ  = plist:getp(moisture_job_desc, Cfg),
     case moisture_job:execute(MJ) of
-	#job_report{result = {success, _}} ->
+	Report = #job_report{result = {success, _}} ->
+	    wrfx_db:store(Report),
 	    postprocess(J, Log);
 	Failure ->
+	    wrfx_db:store(Failure),
 	    job_failed(moisture_code, J, Failure, Log)
     end.
 
@@ -137,9 +141,10 @@ postprocess(J=#job_desc{key=JK, cfg=Cfg}, Log) ->
 				  
     
 
-job_failed(A, F, #job_desc{key=JK, cfg=Cfg}, Log) ->
+job_failed(A, F=#job_report{result = {failure, Reason}}, #job_desc{key=JK, cfg=Cfg}, Log) ->
 
     logd:message(io_lib:format("[FD] [FAILED] in stage ~p", [A]), Log),
+    logd:message(io_lib:format("[FD] [FAILED] with reason ~p", [Reason]), Log),
     logd:close(Log),
 
     % return a job report
@@ -147,7 +152,7 @@ job_failed(A, F, #job_desc{key=JK, cfg=Cfg}, Log) ->
 		job_desc_key = JK,
 		started = plist:getp(started, Cfg),
 		completed = calendar:local_time(),
-		result = F,
+		result = {failure, F},
 		wksp_dir = [],
 		stor_dom = [],
 		log_stor_id = {},

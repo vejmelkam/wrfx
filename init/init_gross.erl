@@ -24,7 +24,7 @@ C = [ {wrf_id, wrf_34_mpi},
       {mpi_nprocs, 12*4},
       {mpi_nodes, [ "node09", "node10", "node11", "node12" ]},
       {schedule, {9, 0, 0}},
-      {auto_start, true},
+      {auto_start, false},
 %      {ncks_prune_wrfout, ["Times", "T2", "PSFC", "XLAT", "XLONG", "Q2", "RAINNC", "RAINC", "HGT"]},
       {mf, {wrf_job, execute}}].
 
@@ -99,8 +99,7 @@ C4 = [ {wrf_job_id, colorado_2km_short_run},
        {riak_host, "localhost"},
        {riak_port, "10017"},
        {auto_start, false},
-       {mf, {fire_danger_job, execute}}
-     ].
+       {mf, {fire_danger_job, execute}} ].
 
 wrfx_db:store({job_desc, fire_danger_operational_test, C4}).
 
@@ -111,10 +110,11 @@ C5 = [ {wrf_job_id, colorado_2km_op_wrf_48hr_run},
        {vars, "T2,RH,RAIN,FM1,FM10,FM100"},
        {riak_host, "localhost"},
        {riak_port, "10017"},
+       {schedule, {9, 0, 0}},
        {auto_start, true},
        {mf, {fire_danger_job, execute}} ].
 
-wrfx_db_store({job_desc, fire_danger_operational_v1, C5}).
+wrfx_db:store({job_desc, fire_danger_operational_v1, C5}).
 
 
 % store the example namelists

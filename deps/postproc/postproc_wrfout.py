@@ -188,6 +188,11 @@ if __name__ == '__main__':
 
     plot_queue = Queue()
 
+    # construct temporal parts of keys 
+    ts_strings = []
+    for t in range(len(ts)):
+        ts_strings.append(ts[t].strftime("%Y-%m-%d_%H:%M:00"))
+
     # loop through variables requested
     for vname in varlst:
         print("INFO: enqueuing variable %s ..." % vname)
@@ -199,9 +204,7 @@ if __name__ == '__main__':
 
         caxis = (np.amin(data), np.amax(data))
         for t in range(len(ts)):
-            ts_t = ts[t]
-            ts_str = ts_t.strftime("%Y-%m-%d_%H:%M:00")
-            riak_key = vname + "_" + ts_str
+            riak_key = vname + "_" + ts_strings[t]
             fname = os.path.join(args.output_dir, riak_key + ".png")
             plot_queue.put((data[t, :, :], caxis, riak_key, fname))
 
@@ -219,5 +222,19 @@ if __name__ == '__main__':
     for worker in workers:
         worker.join()
 
-    print("INFO: all workers done, exiting.")
+    print("INFO: uploading key set to server.")
+    client = riak.RiakClient(host = args.riak_host,
+                             pb_port = args.riak_port,
+                             protocol = 'pbc')
+
+    bucket = client.bucket(args.bucket)
+    valid_ts = bucket.new("current_valid_ts",
+                          data = string.join(ts_strings, "|"),
+                          content_type = "text/plain")
+    valid_ts.store()
+
+    print("INFO: key set stored.")
+               
+
+    
 
