@@ -68,12 +68,13 @@ execute(J=#job_desc{cfg=Cfg}) ->
     
     Cfg2 = plist:update_with([{moisture_job_desc, MJ#job_desc{cfg=Mcfg2}},
 			      {started, calendar:local_time()},
-			      {job_id, JI}], Cfg),
+			      {job_id, JI},
+			      {instr, []}], Cfg),
 
     % open a logger that will record all plan activity
     Wkspace = wrfx_db:get_conf(workspace_root),
     Log = logd:open([stdio, filename:join(Wkspace, lists:flatten([JI, ".log"]))]),
-    logd:message("[FD] [STAGE] running wrf job", Log),
+    logd:message(io_lib:format("[FD] [STAGE] this is fire danger job with id [~p]", [JI]), Log),
     case wrf_job:execute(WJ) of
 	Report = #job_report{result = {success, _}} ->
 	    wrfx_db:store(Report),
@@ -86,7 +87,6 @@ execute(J=#job_desc{cfg=Cfg}) ->
 
 
 run_moisture_job(J=#job_desc{cfg=Cfg}, Log) ->
-    logd:message("[FD] [STAGE] running moisture code", Log),
     MJ  = plist:getp(moisture_job_desc, Cfg),
     case moisture_job:execute(MJ) of
 	Report = #job_report{result = {success, _}} ->
@@ -124,7 +124,8 @@ postprocess(J=#job_desc{key=JK, cfg=Cfg}, Log) ->
     PL = plan_logger:start(Log),
     PID = plan_runner:execute_plan(Plan, [PL]),
     case plan_runner:wait_for_plan(PID) of
-	{success, _} ->
+	{success, PlanInstr} ->
+	    NewInstr = plist:update_with(PlanInstr, plist:getp(instr, Cfg)),
 	    logd:message("[FD] [SUCCESS] complete", Log),
 	    #job_report{job_id = plist:getp(job_id, Cfg),
 			job_desc_key = JK,
@@ -134,14 +135,14 @@ postprocess(J=#job_desc{key=JK, cfg=Cfg}, Log) ->
 			wksp_dir = [],
 			stor_dom = [],
 			log_stor_id = {},
-			inst = [] };
-	R ->
-	    job_failed(postprocess, J, Log, R)
+			inst = NewInstr};
+	Failure ->
+	    job_failed(postprocess, J, Failure, Log)
     end.
 				  
     
 
-job_failed(A, F=#job_report{result = {failure, Reason}}, #job_desc{key=JK, cfg=Cfg}, Log) ->
+job_failed(A, #job_desc{key=JK, cfg=Cfg}, F=#job_report{result = {failure, Reason}}, Log) ->
 
     logd:message(io_lib:format("[FD] [FAILED] in stage ~p", [A]), Log),
     logd:message(io_lib:format("[FD] [FAILED] with reason ~p", [Reason]), Log),

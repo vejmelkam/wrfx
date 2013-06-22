@@ -35,8 +35,8 @@ test_job() ->
 %% @spec id(job_desc()) -> string()
 %%
 id(#job_desc{cfg=Cfg}) ->
-    {FromYr, _FromDay} = plist:getp(from, Cfg),
-    lists:flatten(["moisture_job_", format_time(FromYr)]).
+    FromTS = plist:getp(from, Cfg),
+    lists:flatten(["moisture_job_", esmf:time_to_string(FromTS)]).
     
 
 
@@ -188,10 +188,6 @@ store_output_files(#job_desc{cfg=Cfg}, Log)->
     logd:close(Log),
     PathLF = filename:join(wrfx_db:get_conf(workspace_root), LFName),
     wrfx_fstor:store({Dom, LFName}, PathLF).
-
-
-format_time({Y,M,D}) ->
-    io_lib:format("~4..0B-~2..0B-~2..0B", [Y, M, D]).
 
 
 retrieve_xls_files(Ds, Ss) ->
