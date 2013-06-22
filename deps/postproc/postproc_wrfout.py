@@ -19,7 +19,9 @@ from wrf_model_data import WRFModelData
 
 
 def postproc_worker(w, args, counties, jobs):
-    fig = plt.figure(figsize = (8, 6))
+
+    fig = plt.figure(figsize = (8, 5))
+    fig.subplots_adjust(left=0.1, right = 1.0, top = 1.0, bottom = 0.05)
 
     print("WORKER: setting up RIAK client")
     client = riak.RiakClient(host = args.riak_host,
@@ -54,9 +56,6 @@ def postproc_worker(w, args, counties, jobs):
                              encoded_data = fig_data,
                              content_type = 'image/png')
         new_fig.store()
-        
-        
-
 
 
 def render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, fname):
@@ -150,12 +149,11 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--bucket', metavar='B', type=str, dest='bucket', help='bucket under which to save the images')
     parser.add_argument('-n', '--hostname', metavar = 'N', type=str, dest='riak_host', help='riak hostname')
     parser.add_argument('-p', '--port', metavar = 'P', type=int, dest='riak_port', help='riak port accepting pbc transactions')
+    parser.add_argument('-w', '--workers', metavar = 'W', type=int, dest='num_workers', default=10, help='number of workers to spawn')
     args = parser.parse_args()
 
     varlst = args.varlst or 'T2,RAIN,RH,FM1,FM10,FM100'
     varlst = string.split(varlst, ',')
-
-    num_workers = 10
 
     # load required variables
     load_lst = list(varlst)
@@ -174,6 +172,8 @@ if __name__ == '__main__':
     w = WRFModelData(args.wrfout_file, load_lst)
     ts = w['GMT']
 
+    N = len(ts)
+
     if 'RH' in varlst:
         w.compute_relative_humidity()
 
@@ -190,7 +190,7 @@ if __name__ == '__main__':
 
     # construct temporal parts of keys 
     ts_strings = []
-    for t in range(len(ts)):
+    for t in range(N):
         ts_strings.append(ts[t].strftime("%Y-%m-%d_%H:%M:00"))
 
     # loop through variables requested
@@ -203,14 +203,14 @@ if __name__ == '__main__':
             data = (data - 273.15) * 9.0 / 5 + 32.0
 
         caxis = (np.amin(data), np.amax(data))
-        for t in range(len(ts)):
+        for t in range(N):
             riak_key = vname + "_" + ts_strings[t]
             fname = os.path.join(args.output_dir, riak_key + ".png")
             plot_queue.put((data[t, :, :], caxis, riak_key, fname))
 
     # start the worker pool
     workers = []
-    for i in range(num_workers): 
+    for i in range(args.num_workers): 
         # end-of-queue marker (one for each worker)
         plot_queue.put(None)
 
