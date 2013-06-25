@@ -11,6 +11,10 @@ import riak
 import shapefile
 from multiprocessing import Pool, Queue, Process
 
+# use agg renderer, suitable for raster graphics
+import matplotlib
+matplotlib.use("agg")
+
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from mpl_toolkits.basemap import Basemap
@@ -18,20 +22,22 @@ from mpl_toolkits.basemap import Basemap
 from wrf_model_data import WRFModelData
 
 
-def postproc_worker(w, args, counties, jobs):
+
+def postproc_worker(lats, lons, args, counties, jobs, i):
+
+    done = 0
 
     fig = plt.figure(figsize = (8, 5))
     fig.subplots_adjust(left=0.1, right = 1.0, top = 1.0, bottom = 0.05)
 
-    print("WORKER: setting up RIAK client")
+    print("WORKER [%d]: setting up RIAK client" % i)
     client = riak.RiakClient(host = args.riak_host,
                              pb_port = args.riak_port,
                              protocol = 'pbc')
     bucket = client.bucket(args.bucket)
 
     # setup basemap projection
-    print("WORKER: setting up basemap projection")
-    lats, lons = w.get_lats(), w.get_lons()
+    print("WORKER [%d]: setting up basemap projection" % i)
     m = setup_basemap_proj(lats, lons)
     mx, my = m(lons, lats)
 
@@ -44,18 +50,32 @@ def postproc_worker(w, args, counties, jobs):
 
         data, caxis, riak_key, fname = tmp
 
+        print("WORKER [%d]: rendering job %d ..." % (i, done+1)) 
+
         # perform the render
         render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, fname)
 
+        # run convert to generate jpeg
+        jpeg_name = fname.replace(".png", ".jpeg")
+        os.system("convert %s -quality 75 %s" % (fname, jpeg_name))
+
         # read in the file just generated
-        with open(fname, 'rb') as f:
+        with open(jpeg_name, 'rb') as f:
             fig_data = f.read()
+
+        print("WORKER [%d]: uploading job %d ... " % (i, done+1))
 
         # store it in RIAK
         new_fig = bucket.new(riak_key,
                              encoded_data = fig_data,
-                             content_type = 'image/png')
+                             content_type = 'image/jpeg')
         new_fig.store()
+
+        done += 1
+        print("WORKER [%d]: job %d uploaded. " % (i, done))
+
+
+    print("WORKER [%d]: queue emptied, exiting." % i)
 
 
 def render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, fname):
@@ -215,7 +235,7 @@ if __name__ == '__main__':
         plot_queue.put(None)
 
         # create a new worker and add it to the pool
-        tmp = Process(target=postproc_worker, args=(w, args, counties, plot_queue))
+        tmp = Process(target=postproc_worker, args=(lats, lons, args, counties, plot_queue, i))
         tmp.start()
         workers.append(tmp)
 
