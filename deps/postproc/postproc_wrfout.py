@@ -57,7 +57,7 @@ def postproc_worker(lats, lons, args, counties, jobs, i):
 
         # run convert to generate jpeg
         jpeg_name = fname.replace(".png", ".jpeg")
-        os.system("convert %s -quality 75 %s" % (fname, jpeg_name))
+        os.system("convert %s -resize 700x437 -quality 75 %s" % (fname, jpeg_name))
 
         # read in the file just generated
         with open(jpeg_name, 'rb') as f:
