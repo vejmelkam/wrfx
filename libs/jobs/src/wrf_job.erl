@@ -422,23 +422,36 @@ make_namelists(Cfg) ->
 
 
 retrieve_grib_files(R, From, To) ->
+    retrieve_grib_files(R, From, To, 0).
+
+retrieve_grib_files(R, From, To, CycleDelta) ->
     Dom = R:domain(),
     URLBase = R:url_prefix(),
-    {ok, Cov, IDs} = R:manifest(From, To, 0),
-    {Cov, R:vtable(), R:nl_updates(), retrieve_grib_files(Dom, URLBase, IDs, [])}.
+    case R:manifest(From, To, CycleDelta) of
+	{ok, Cov, IDs} ->
+	    case verify_gribs_exist(URLBase, IDs) of
+		{success, _} ->
+		    io:format("found gribs, coverage is ~p~n", [Cov]),
+		    {Cov, R:vtable(), R:nl_updates(), get_grib_files(Dom, URLBase, IDs, [])};
+		{failure, _} ->
+		    retrieve_grib_files(R, From, To, CycleDelta + 1)
+	    end;
+	F ->
+	    F
+    end.
 
 
-retrieve_grib_files(_Dom, _URL, [], List) ->
+get_grib_files(_Dom, _URL, [], List) ->
     List;
 
-retrieve_grib_files(Dom, URLBase, [Name|Names], List) ->
+get_grib_files(Dom, URLBase, [Name|Names], List) ->
     case wrfx_fstor:exists({Dom, Name}) of
 	false ->
 	    {success, _} = tasks_net:http_sync_get_stream(URLBase ++ Name, "/tmp/wrfx-download"),
 	    {success, F} = wrfx_fstor:store({Dom, Name}, "/tmp/wrfx-download"),
-	    retrieve_grib_files(Dom, URLBase, Names, [F|List]);
+	    get_grib_files(Dom, URLBase, Names, [F|List]);
 	{true, F} ->
-	    retrieve_grib_files(Dom, URLBase, Names, [F|List])
+	    get_grib_files(Dom, URLBase, Names, [F|List])
     end.
 
 
@@ -479,3 +492,14 @@ extract_interval(Cfg) ->
     end,
     {From, To}.
     
+
+
+verify_gribs_exist(_URLBase, []) ->
+    {success, []};
+verify_gribs_exist(URLBase, [G|Gs]) ->
+    case tasks_net:http_sync_head(URLBase ++ G) of
+	{success, _} ->
+	    verify_gribs_exist(URLBase, Gs);
+	{failure, R} ->
+	    {failure, lists:flatten(R)}
+    end.
