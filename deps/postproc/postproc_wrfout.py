@@ -22,6 +22,17 @@ from mpl_toolkits.basemap import Basemap
 from wrf_model_data import WRFModelData
 
 
+RenderConfig = {
+
+    'T2' : { 'caxis' : None, 'cmap' : 'jet' },
+    'RH' : { 'caxis' : (0.0, 100.0), 'cmap' : 'jet_r' },
+    'RAIN' : { 'caxis' : None, 'cmap' : 'Greys' },
+    'FM1' : { 'caxis' : (0.0, 30.0), 'cmap' : 'jet_r' },
+    'FM10' : { 'caxis' : (0.0, 30.0), 'cmap' : 'jet_r' },
+    'FM100' : { 'caxis' : (0.0, 30.0), 'cmap' : 'jet_r' }
+
+}
+
 
 def postproc_worker(lats, lons, args, counties, jobs, i):
 
@@ -48,12 +59,12 @@ def postproc_worker(lats, lons, args, counties, jobs, i):
         if tmp == None:
             return
 
-        data, caxis, riak_key, fname = tmp
+        data, caxis, cmap, riak_key, fname = tmp
 
         print("WORKER [%d]: rendering job %d ..." % (i, done+1)) 
 
         # perform the render
-        render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, fname)
+        render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, cmap, fname)
 
         # run convert to generate jpeg
         jpeg_name = fname.replace(".png", ".jpeg")
@@ -78,7 +89,7 @@ def postproc_worker(lats, lons, args, counties, jobs, i):
     print("WORKER [%d]: queue emptied, exiting." % i)
 
 
-def render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, fname):
+def render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, cmap, fname):
     # prep figure for reuse
     fig.clf()
     ax = plt.subplot(111)
@@ -88,7 +99,7 @@ def render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, fname):
     y1, y2 = np.amin(lats), np.amax(lats)
 
     # paint the image
-    m.pcolormesh(mx, my, data, shading='gouraud')
+    m.pcolormesh(mx, my, data, shading='gouraud', cmap = cmap)
 
     # draw parallels/meridians
     m.drawparallels(np.arange(int(y1), int(y2)+1, 2.), labels=[1,0,0,0], color='black',
@@ -102,7 +113,7 @@ def render_to_png(fig, m, data, lats, lons, mx, my, counties, caxis, fname):
 
     # add title & colorbar
     plt.clim(caxis)
-    plt.colorbar()
+    plt.colorbar(shrink = 0.9)
 
     fig.savefig(fname)
     fig.clf()
@@ -216,17 +227,21 @@ if __name__ == '__main__':
     # loop through variables requested
     for vname in varlst:
         print("INFO: enqueuing variable %s ..." % vname)
+        rcfg = RenderConfig[vname]
 
         data = w[vname]
         if vname == 'T2':
             # convert to Fahrenheit
             data = (data - 273.15) * 9.0 / 5 + 32.0
+        elif vname.startswith('FM'):
+            data = data * 100.0
 
-        caxis = (np.amin(data), np.amax(data))
+        caxis = rcfg['caxis'] or (np.amin(data), np.amax(data))
+        cmap = rcfg['cmap']
         for t in range(N):
             riak_key = vname + "_" + ts_strings[t]
             fname = os.path.join(args.output_dir, riak_key + ".png")
-            plot_queue.put((data[t, :, :], caxis, riak_key, fname))
+            plot_queue.put((data[t, :, :], caxis, cmap, riak_key, fname))
 
     # start the worker pool
     workers = []
