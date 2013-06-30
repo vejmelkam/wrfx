@@ -52,28 +52,29 @@ manifest(From, To, Delta) ->
     EmptyCoverage = {atime:dt_shift_hours(ToAdj, 1), atime:dt_shift_hours(FromAdj, -1)},
 
     try
-	build_file_list(FromAdj, ToAdj, LatestCycle, EmptyCoverage, no_ref, [])
+	build_file_list(FromAdj, ToAdj, LatestCycle, Delta, EmptyCoverage, no_ref, [])
     catch
 	invalid_forecast_hour ->
-	    {error, io_lib:format("unavailable data for time range ~s to ~s with delta ~p~n",
-				  [esmf:time_to_string(From), esmf:time_to_string(To), Delta])}
+	    Msg = io_lib:format("unavailable data for time range ~s to ~s with delta ~p~n",
+				  [esmf:time_to_string(From), esmf:time_to_string(To), Delta]),
+	    {error, lists:flatten(Msg)}
     end.
 
 
-build_file_list(Now, To, LatestCycle, Coverage={_CFrom, CTo}, LastRef, Files) when To > CTo->
+build_file_list(Now, To, LatestCycle, Delta, Coverage={_CFrom, CTo}, LastRef, Files) when To > CTo->
     NextNow = atime:dt_shift_hours(Now, 1),
-    CT = cull_cycle(get_cycle_time(Now, 0), LatestCycle),
+    CT = cull_cycle(get_cycle_time(Now, Delta), LatestCycle),
     H = forecast_hour(atime:dt_hours_between(CT, Now)),
     case {CT, H} == LastRef of
 	true ->
-	    build_file_list(NextNow, To, LatestCycle, Coverage, LastRef, Files);
+	    build_file_list(NextNow, To, LatestCycle, Delta, Coverage, LastRef, Files);
 	false ->
 	    RefTime = atime:dt_shift_hours(CT, H),
 	    File = construct_file_ref(CT, H),
-	    build_file_list(NextNow, To, LatestCycle, update_coverage(Coverage, RefTime), {CT, H}, [File|Files])
+	    build_file_list(NextNow, To, LatestCycle, Delta, update_coverage(Coverage, RefTime), {CT, H}, [File|Files])
     end;
 
-build_file_list(_Now, _To, _LatestCycle, Coverage, _LastRef, Files) ->
+build_file_list(_Now, _To, _LatestCycle, _Delta, Coverage, _LastRef, Files) ->
     {ok, Coverage, Files}.
 
 
