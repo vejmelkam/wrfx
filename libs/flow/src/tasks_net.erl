@@ -2,7 +2,7 @@
 -module(tasks_net).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
 
--export([http_sync_get_stream/2, http_sync_get/1]).
+-export([http_sync_get_stream/2, http_sync_get/1, http_sync_head/1]).
 
 
 http_sync_get_stream(URL, Tgt) ->
@@ -31,4 +31,18 @@ http_sync_get(URL) ->
 	    {failure, io_lib:format("http get ~s failed, server returned ~p with reason ~p", [URL, Code, Reason])};
 	{error, R} ->
 	    {failure, io_lib:format("http get ~s failed with error ~p", [URL, R])}
+    end.
+
+
+http_sync_head(URL) ->
+    case httpc:request(head, {URL, []}, [], []) of
+	{ok, {{_Ver, 200, _Reason}, _Hdr, _Bdy}} ->
+	    Msg = io_lib:format("http head ~s success, code 200", [URL]),
+	    {success, lists:flatten(Msg)};
+	{ok, {{_Ver, Code, Reason}, _Hdr, _Bdy}} ->
+	    Msg = io_lib:format("http head ~s failed with code ~p and reason ~p", [URL, Code, Reason]),
+	    {failure, Msg};
+	{error, R} ->
+	    Msg = io_lib:format("http head ~s failed with error ~p", [URL, R]),
+	    {failure, Msg}
     end.
