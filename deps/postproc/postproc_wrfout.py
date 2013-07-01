@@ -29,7 +29,9 @@ RenderConfig = {
     'RAIN' : { 'caxis' : None, 'cmap' : 'Greys' },
     'FM1' : { 'caxis' : (0.0, 30.0), 'cmap' : 'jet_r' },
     'FM10' : { 'caxis' : (0.0, 30.0), 'cmap' : 'jet_r' },
-    'FM100' : { 'caxis' : (0.0, 30.0), 'cmap' : 'jet_r' }
+    'FM100' : { 'caxis' : (0.0, 30.0), 'cmap' : 'jet_r' },
+    'F_ROS' : { 'caxis' : None, 'cmap' : 'jet' },
+    'F_LINEINT2' : { 'caxis' : None, 'cmap' : 'jet' }
 
 }
 
