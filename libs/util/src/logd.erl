@@ -8,7 +8,7 @@
 
 -module(logd).
 -author("Martin Vejmelka <vejmelkam@gmail.com>").
--export([open/1, close/1, message/2]).
+-export([open/1, close/1, message/2, message/3]).
 
 
 %% @doc Starts a logger that logs to the targets given in a list.
@@ -29,6 +29,13 @@ close(PID) ->
 message(M, PID) ->
     PID ! {self(), msg, M},
     ok.
+
+%% @doc Sends a message to the logger, which is routed to all targets.
+%% @spec message(string(), [term()], pid()) -> ok
+message(M, A, PID) ->
+    PID ! {self(), msg, io_lib:format(M, A)},
+    ok.
+
 
 logd_msg_loop(Ds) ->
     receive

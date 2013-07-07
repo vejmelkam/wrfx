@@ -16,11 +16,14 @@ start(PID) ->
 
 plan_logger_loop(PID) ->
     receive
+	{_PID, task_start, {M,F,A}} ->
+	    logd:message("[task init] ~s:~s args ~p", [M, F, A], PID),
+	    plan_logger_loop(PID);
 	{_PID, task_done, Text} ->
-	    logd:message(io_lib:fwrite("[task complete] ~s", [Text]), PID),
+	    logd:message("[task complete] ~s", [Text], PID),
 	    plan_logger_loop(PID);
 	{_PID, failure, Error} ->
-	    logd:message(io_lib:fwrite("[FAILED] ~s", [Error]), PID);
+	    logd:message("[FAILED] ~s", [Error], PID);
 	{_PID, success} ->
 	    logd:message("[SUCCESS] plan complete", PID);
 	{_PID, stop} ->

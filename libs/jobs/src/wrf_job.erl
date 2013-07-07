@@ -91,13 +91,16 @@ execute(J=#job_desc{cfg=CfgOverw}) ->
     WPSExecDir = filename:join(Wkspace, "wps_exec_" ++ JI),
     WRFExecDir = filename:join(Wkspace, "wrf_exec_" ++ JI),
 
+    % open a logger that will record all plan activity
+    Log = logd:open([stdio, filename:join(Wkspace, io_lib:format("~s.log", [JI]))]),
+
     % ensure these workspaces are empty
     tasks_fsys:delete_dir(WPSExecDir),
     tasks_fsys:delete_dir(WRFExecDir),
 
     % retrieve GRIB files
     GribSrc = lists:nth(1, plist:getp(grib_sources, Cfg)),
-    {{CovFrom, CovTo}, VtableFile, NLExtraKeys, GribFiles} = retrieve_grib_files(GribSrc, From, To),
+    {{CovFrom, CovTo}, VtableFile, NLExtraKeys, GribFiles} = retrieve_grib_files(GribSrc, From, To, Log),
 
     % update cfg with wps: GRIB file time limits, vtable file to use and wrf: from-to range
     Cfg2 = plist:update_with([{grib_files, GribFiles},
@@ -119,9 +122,6 @@ execute(J=#job_desc{cfg=CfgOverw}) ->
 
     % construct WRF and WPS namelists
     Cfg3 = make_namelists(Cfg2),
-
-    % open a logger that will record all plan activity
-    Log = logd:open([stdio, filename:join(Wkspace, io_lib:format("~s.log", [JI]))]),
 
     run_wps(J#job_desc{cfg=Cfg3}, Log).
 
@@ -421,37 +421,43 @@ make_namelists(Cfg) ->
     plist:update_with([ {wps_nl, WPSNL}, {wrf_nl, WRFNL} ], Cfg).
 
 
-retrieve_grib_files(R, From, To) ->
-    retrieve_grib_files(R, From, To, 0).
+retrieve_grib_files(R, From, To, Log) ->
+    retrieve_grib_files(R, From, To, Log, 0).
 
-retrieve_grib_files(R, From, To, CycleDelta) ->
+retrieve_grib_files(R, From, To, Log, CycleDelta) ->
     Dom = R:domain(),
     URLBase = R:url_prefix(),
+    logd:message("retrieving grib files From ~p to ~p", [From, To], Log),
     case R:manifest(From, To, CycleDelta) of
 	{ok, Cov, IDs} ->
+	    logd:message("manifest has ~p files", [length(IDs)], Log),
 	    case verify_gribs_exist(URLBase, IDs) of
 		{success, _} ->
-		    io:format("found gribs, coverage is ~p~n", [Cov]),
-		    {Cov, R:vtable(), R:nl_updates(), get_grib_files(Dom, URLBase, IDs, [])};
+		    logd:message("GRIBs located on server, coverage is ~p, moving to d/l", [Cov], Log),
+		    {Cov, R:vtable(), R:nl_updates(), get_grib_files(Dom, URLBase, IDs, Log, [])};
 		{failure, _} ->
-		    retrieve_grib_files(R, From, To, CycleDelta + 1)
+		    logd:message("missing GRIBs in cycle ~p, moving to prior cycle", [CycleDelta], Log),
+		    retrieve_grib_files(R, From, To, Log, CycleDelta + 1)
 	    end;
 	F ->
 	    F
     end.
 
 
-get_grib_files(_Dom, _URL, [], List) ->
+get_grib_files(_Dom, _URL, [], _Log, List) ->
     List;
 
-get_grib_files(Dom, URLBase, [Name|Names], List) ->
+get_grib_files(Dom, URLBase, [Name|Names], Log, List) ->
     case wrfx_fstor:exists({Dom, Name}) of
 	false ->
+	    logd:message("[d/l] retrieving named file ~p", [Name], Log),
 	    {success, _} = tasks_net:http_sync_get_stream(URLBase ++ Name, "/tmp/wrfx-download"),
 	    {success, F} = wrfx_fstor:store({Dom, Name}, "/tmp/wrfx-download"),
-	    get_grib_files(Dom, URLBase, Names, [F|List]);
+	    logd:message("[d/l] stored file ~p", [Name], Log),
+	    get_grib_files(Dom, URLBase, Names, Log, [F|List]);
 	{true, F} ->
-	    get_grib_files(Dom, URLBase, Names, [F|List])
+	    logd:message("[d/l] file ~p was cached, skipping", [Name], Log),
+	    get_grib_files(Dom, URLBase, Names, Log, [F|List])
     end.
 
 
